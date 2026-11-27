@@ -19,6 +19,6 @@
     "@cloudflare/workers-types": "5.20261120.1",
     "@heydovo/config": "workspace:*",
     "vitest": "5.1.1",
-    "wrangler": "4.165.0"
+    "wrangler": "4.166.0"
   }
 }
