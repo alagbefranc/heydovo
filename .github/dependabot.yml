@@ -8,6 +8,13 @@ updates:
     # Wait a week before proposing a newly published version (supply-chain protection).
     cooldown:
       default-days: 7
+    ignore:
+      # typescript-eslint supports TypeScript below 6.1 only. Move both together by hand
+      # (packages/config/CLAUDE.md).
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
+      # Pinned to the browsers installed in the build environment.
+      - dependency-name: "@playwright/test"
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
