@@ -27,3 +27,18 @@ Search the repo for `[CONFIRM]` too. Resolve these before the related build step
 - Website: what each provider needs to see on it for approval (RCS brand verification, WhatsApp business verification, Stripe, SMS sender registration); security.txt contact address; analytics consent under Law 25.
 - French shortcut words RAMASSAGE (PICKUP), PLUS (MORE) and REPRENDRE (START) reviewed by a native speaker.
 - Telnyx keywords: support for custom opt-in/opt-out words, and whether Telnyx or the carriers treat CANCEL, END or QUIT as opt-out words by default (CANCEL is our "cancel my order" shortcut).
+- Hostnames for vendor-portal and admin-portal (each on its own hostname, not a path on heydovo.com).
+- Telnyx webhook time limit (the secret-masking check must finish before the ack).
+
+## Security design items raised in review
+These came out of the independent security review of this pack. They are weaknesses in the original design that have not been changed yet. Decide each one before the build step named.
+- PIN reset needs only an OTP sent to the same phone, so the PIN does not protect against someone holding the phone or the SIM (step 6).
+- `wallet.hold` carries no proof that the PIN was verified. Approval arrives as a `pin.verified` event, and nothing restricts which Worker may publish it (steps 6, 12, 13).
+- The two-person refund rule lives only in admin-service; `wallet.refund` carries no evidence of the approvals (steps 12, 19).
+- auth-security has no allowed-caller table of its own: any Worker that binds it can create secure links for any user, start a PIN reset or require re-verification (step 6).
+- The sender's phone number is the identity for chat and for vendor text commands. SMS sender numbers can be spoofed, so a spoofed vendor staff number could pause a store or accept and decline orders (steps 8, 16).
+- The 7-day `track` link shows the pickup code, so anyone holding that link can collect the order (steps 6, 14).
+- Secret masking covers text messages only, not voice transcripts, MCP tool arguments or photo captions (steps 16, 21, 22).
+- Meta Muse account linking uses phone OTP only, and PIN links are returned to the MCP client (step 22).
+- Terraform-managed Hyperdrive configs and database roles put role passwords in Terraform state, against the infra rule (step 3).
+- The agent's output filter blocks PIN/OTP-like strings, but an address with a 4–6 digit number has to be confirmed back to the user (step 16).

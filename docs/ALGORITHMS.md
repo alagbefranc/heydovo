@@ -109,6 +109,7 @@ Double-entry. Every transaction's entries sum to zero (enforced by a deferred co
 - 4–6 digits. Reject weak PINs: all same digit, sequences (1234, 4321, 123456), the last 4 digits of the user's phone, and a top-100 common list.
 - Store `argon2id(HMAC-SHA256(pepper, pin), salt)`. Pepper from Secrets Store (makes stolen hashes useless without the secret, since 6-digit PINs are otherwise easy to brute-force offline). Tune argon2id parameters to fit Workers CPU/memory limits [CONFIRM by benchmark].
 - Verify with constant-time comparison. 5 consecutive failures → LOCKED (wallet spending blocked) → `pin.locked`. Unlock = OTP + set a new PIN.
+- RESET_REQUIRED (`pins.reset_required_at`), set when the PIN was exposed in chat (§15): `verifyPin` fails with `PIN_RESET_REQUIRED`, open `pin_approve` links are voided and wallet spending is blocked, exactly as for LOCKED. Cleared only by OTP + a new PIN that differs from the old one.
 - PIN never travels through chat, logs, analytics, AI or email. Only the secure page posts it, over TLS, directly to auth-security.
 
 ## 8. Secure links (auth-security-service)
@@ -127,7 +128,7 @@ Double-entry. Every transaction's entries sum to zero (enforced by a deferred co
 NEW → LANGUAGE → NAME → ADDRESS (geocode + served-area check; not served → waitlist) → SETUP_LINK_SENT → VERIFIED (phone OTP + terms/privacy accepted + PIN set) → WALLET_OFFERED → ACTIVE.
 - A user who opens with a request ("I need a plumber") runs only the missing steps, then continues the request.
 - Progress saved; one reminder after 24 h, never more.
-- Re-verification required after 90 days inactive, after `security.secret_exposed`, or on suspicious signals.
+- Re-verification required after 90 days inactive, after `security.secret_exposed` of kind pin or card (a typed OTP only cancels that code), or on suspicious signals.
 
 ## 11. Delivery provider selection (delivery-service)
 Launch uses one courier provider, Uber Direct. The steps are written for any number of enabled providers so a second courier or in-house drivers can be added later without changing the rule; with one provider, steps 1–3 come down to getting the Uber Direct quote (timeout 3 s).
@@ -151,31 +152,38 @@ Weekly [CONFIRM day]. For each vendor: payable = vendor_payable balance for orde
 From a verified vendor staff phone only: `YES <ref>` accept · `NO <ref> <reason>` decline · `READY <ref>` · `PICKED <pickup code>` · `PAUSE` / `RESUME` · `HELP`. If a vendor has exactly one pending order, `YES`/`NO`/`READY` without a number applies to it; otherwise ask which.
 
 ## 15. Secret masking (messaging-gateway, with a check by auth-security)
-Runs before any inbound text is stored, logged or forwarded. Two goals: a real PIN, OTP or card number never reaches storage, logs or the AI; and an ordinary number (house number, buzzer code, quantity) never forces a PIN reset.
+Runs in memory before any inbound text is stored, logged, queued or forwarded. Two goals: a real PIN, OTP or card number never reaches storage, logs or the AI; and an ordinary number (house number, buzzer code, quantity) does not force a PIN reset.
+
+**Order in the gateway**: verify signature → per-number rate limit → dedupe → mask in memory → store the redacted text → ack → publish. The raw webhook body is never written to a Queue, KV, Durable Object storage, logs or error reports. The path up to the ack must fit inside Telnyx's webhook time limit [CONFIRM limit].
 
 **Cards**: 13–19 digit sequences passing the Luhn check → `[REDACTED_CARD]`, emit `security.secret_exposed(kind: card)`.
 
-**PIN and OTP candidates**
+**PIN and OTP candidates** (digit runs standing on their own, not part of a longer number or of a ref like `D4821`)
 - (a) a message that is only 4–6 digits;
-- (b) 4–8 digits straight after a secret word: "pin", "nip", "password", "passcode", "mot de passe";
-- (c) 4–6 digits straight after the bare word "code" (often a buzzer or door code).
+- (b) a 4–8 digit run in a message that contains a secret word anywhere: "pin", "nip", "password", "passcode", "mot de passe", "otp", "verification code", "security code", "code de vérification", "code secret";
+- (c) a 4–6 digit run in a message that contains the bare word "code" (often a buzzer or door code);
+- (d) while the sender has an open `pin_approve`, `setup` or `pin_reset` link: the first 4–6 digit run in any message (catches "yes 4821").
 
-For each candidate (at most 3 per message) the gateway calls `auth.checkSecretExposure({ fromE164 | fromBsuid, digits })`. auth-security compares the digits with the sender's own PIN hash and with any unexpired OTP for that sender, and answers `pin`, `otp` or `none`.
-- The digits exist only in memory for that call. They are never logged, stored or put on a Queue.
-- The call is not a PIN attempt. It never counts toward the lockout and never approves or unlocks anything; it can only make things stricter.
-- A sender with no PIN and no live OTP (new or unverified user) gets `none`.
-- Limit: 10 checks per sender per hour (config). Over the limit, on an error, or after a 1 s timeout the answer is `unavailable`.
+**Check**: one call per message, `auth.checkSecretExposure({ sender, candidates })`, carrying at most 3 candidates, 1 s in total, never retried. auth-security compares each candidate with the sender's own PIN hash and with any unexpired OTP for that sender, and answers per candidate `pin`, `otp`, `none` or `unavailable`.
+- `none` means a comparison was made and did not match, or the sender has no PIN and no live OTP at all. Anything that prevents a comparison (limit reached, lookup failure, internal error) is `unavailable`, never `none`.
+- The digits exist only in memory for that call. They are never logged, stored, queued or attached to errors or traces.
+- The call is not a PIN attempt and can only make things stricter: it never approves or unlocks anything.
+- Checked first, before anything else: no comparison is made, and the answer is `unavailable`, when: the PIN is LOCKED or RESET_REQUIRED; the sender has an open `setup` or `pin_reset` link (a PIN is about to be chosen, so anything typed now could become it); the sender is a WhatsApp BSUID not yet linked to a user. A 4th or later candidate in one message is not sent at all and is treated as `unavailable`.
+- A 7–8 digit candidate cannot be a PIN or OTP: it is not sent, and is treated as `none`.
+- Limit: 5 non-matching comparisons per user per rolling 24 h, counted across all of that user's sender ids (config). Each is written to `security_events` (a count, never the digits). At the limit the answer is `unavailable` and a risk signal is raised. Calls for a sender with no PIN and no live OTP do not count.
 
-| Answer | Stored and forwarded text | What happens next |
+| Result | Stored and forwarded text | What happens next |
 |--------|---------------------------|-------------------|
-| `pin` | digits → `[REDACTED]` | auth-security marks the PIN as needing a reset; emit `security.secret_exposed(kind: pin)`; agent sends `secret.exposed_warning` |
-| `otp` | digits → `[REDACTED]` | auth-security cancels that code; emit `security.secret_exposed(kind: otp)`; agent says codes go only on the secure page and offers a new one |
-| `none`, candidate (a) or (c) | unchanged | nothing: it is an ordinary number |
+| `pin` | digits → `[REDACTED]` | auth-security sets RESET_REQUIRED (§7); emit `security.secret_exposed(kind: pin)`; agent sends `secret.exposed_warning` |
+| `otp` | digits → `[REDACTED]` | auth-security cancels that code; emit `security.secret_exposed(kind: otp)`; agent sends `secret.otp_in_chat` (codes go only on the secure page; offers a new one). No re-verification |
+| `none`, candidate (a), (c) or (d) | unchanged | nothing: it is an ordinary number |
 | `none`, candidate (b) | digits → `[REDACTED]` | no reset; agent sends `secret.reminder` (never send PINs or passwords in chat) |
-| `unavailable`, candidate (a) or (c) | digits → `[REDACTED]` | no reset; agent sends `secret.number_hidden` and asks the user to send the number again with a word, for example "unit 1250" |
-| `unavailable`, candidate (b) | digits → `[REDACTED]` | fail safe: treated as `pin` (event + PIN reset) |
+| `unavailable`, candidate (a), (c) or (d) | digits → `[REDACTED]` | no reset; agent sends `secret.number_hidden` and asks for the number again with a word, for example "unit 1250" (while a setup or PIN-reset link is open, `secret.reminder` instead: PINs are chosen only on the secure page) |
+| `unavailable`, candidate (b) | digits → `[REDACTED]` | no reset; agent sends `secret.reminder` |
+| the call itself failed or timed out, candidate (a), (c) or (d) | digits → `[REDACTED]` | no reset; `secret.number_hidden` |
+| the call itself failed or timed out, candidate (b) | digits → `[REDACTED]` | fail safe: treated as `pin` (event + RESET_REQUIRED). Reaching the limit never causes a reset; only a failed call does |
 
-- The gateway lists what it hid in `message.received.redactions` (kinds only: `pin`, `otp`, `card`, `other_secret`, `unchecked_number`) so the agent can pick the template without ever seeing the digits.
+- The gateway lists what it hid in `message.received.redactions` and stores the same list (kinds only: `pin`, `otp`, `card`, `other_secret`, `unchecked_number`), so the agent can pick the template without ever seeing the digits. Templates: `pin` and `card` → `secret.exposed_warning`; `otp` → `secret.otp_in_chat`; `other_secret` → `secret.reminder`; `unchecked_number` → `secret.number_hidden`.
 - Normal use rarely needs an all-digit message anyway: customer-facing order refs carry a letter prefix (for example `D4821` delivery, `P4821` pickup, `B4821` booking) and pickup codes are 6-character letter+digit mixes without lookalikes (no 0/O, 1/I), for example `K7P2QX`.
 
 ## 16. Identifiers shown to people

@@ -10,7 +10,7 @@ Sign-up & verification (business details, documents with expiry, bank via Stripe
 AppShell, StatCard, OrderInboxList, OrderCard (accept/decline countdown), StatusTimeline, CourierTracker, PickupCodeEntry, SubstitutionDialog, ProductTable, ProductForm, ImageUploader, BulkUpload (row errors), ServiceForm, QuoteComposer (with customer photos), CalendarScheduler, HoursEditor, ServiceAreaMap, DocumentUploader, PayoutTable, StatementDownload, ReviewList + ReplyBox, DisputeThread, Charts, TeamTable + RoleSelect, NotificationSettings, TwoFactorSetup, EmptyState, Toasts.
 
 ## Rules
-- Live inbox via Supabase Realtime (vendor-scoped channel) or SSE from api-gateway [CONFIRM choice]; sound + Web Push on new orders.
+- Live inbox via Supabase Realtime (Broadcast sent by the service on a vendor-scoped private channel, never table subscriptions; docs/SECURITY.md, Platform) or SSE from api-gateway [CONFIRM choice]; sound + Web Push on new orders.
 - Role-based UI (owner, manager, staff); hide what a role can't do, and the API still enforces it.
 - Customer data shown: first name, items, delivery address only when needed; never phone numbers.
 - Works well on a cheap Android phone on 4G.

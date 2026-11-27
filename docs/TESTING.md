@@ -27,7 +27,7 @@
 - Daily re-scan of deployed images/dependencies for newly published CVEs, with alerts.
 
 ## CI/CD pipeline
-Pull request → typecheck, lint, unit, contract, SAST, secret and dependency scans → integration tests → deploy to staging → E2E, DAST, AI evals → manual approval for wallet/auth/payment changes → production with gradual rollout and automatic rollback on failed health checks or error-rate spikes.
+Pull request → typecheck, lint, unit, contract, SAST, secret and dependency scans, service-binding allow-list check → integration tests → deploy to staging → E2E, DAST, AI evals → manual approval for wallet/auth/payment changes → production with gradual rollout and automatic rollback on failed health checks or error-rate spikes.
 
 ## Test data
 Synthetic only. Never real customer data outside production. Stripe test cards, provider sandboxes, fake phone numbers in the reserved ranges.

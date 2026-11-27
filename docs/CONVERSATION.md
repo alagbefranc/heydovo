@@ -17,12 +17,12 @@ There is no app UI. The conversation is the product. Implemented mainly in agent
 6. When unsure, after two failed clarifications, or if the user is upset → offer a human (AGENT).
 7. Photos welcome for repairs and order problems.
 8. Emergencies (gas smell, fire, sparking/flooding near electrics, carbon monoxide alarm): first tell the user to leave if unsafe and call 911 or the utility; then offer help. Never delay safety advice. **(code: keyword pre-check before LLM)**
-9. Never ask for or repeat a PIN, OTP, or card number in chat. If a user sends one, it's masked upstream (docs/ALGORITHMS.md §15); reply with the matching `secret.*` template. A PIN reset starts only when the digits matched the user's real PIN, so a house number or buzzer code sent on its own is treated as an ordinary number.
+9. Never ask for or repeat a PIN, OTP, or card number in chat. If a user sends one, it's masked upstream (docs/ALGORITHMS.md §15); reply with the matching `secret.*` template. A PIN reset is forced when the digits matched the user's real PIN (or, rarely, when the check itself failed on a message that names a PIN), so a house number or buzzer code sent on its own is treated as an ordinary number.
 10. Never share vendor or customer phone numbers. All contact goes through Dovo.
 11. Restricted items (alcohol, cannabis, tobacco, weapons, prescription drugs) are refused politely unless admin enables a category with age checks.
 
 ## Message templates (keys live in packages/contracts/src/templates, EN + FR)
-- `summary.product`, `summary.booking`, `confirm.pin_link`, `confirm.pay_link`, `order.confirmed`, `order.accepted`, `order.ready_pickup`, `delivery.picked_up`, `delivery.arriving`, `order.delivered`, `booking.on_the_way`, `booking.final_quote`, `order.cancelled`, `refund.issued`, `wallet.low_balance`, `pin.locked`, `secret.exposed_warning`, `secret.reminder`, `secret.number_hidden`, `emergency.safety_first`, `handoff.started`, `error.generic`.
+- `summary.product`, `summary.booking`, `confirm.pin_link`, `confirm.pay_link`, `order.confirmed`, `order.accepted`, `order.ready_pickup`, `delivery.picked_up`, `delivery.arriving`, `order.delivered`, `booking.on_the_way`, `booking.final_quote`, `order.cancelled`, `refund.issued`, `wallet.low_balance`, `pin.locked`, `secret.exposed_warning`, `secret.otp_in_chat`, `secret.reminder`, `secret.number_hidden`, `emergency.safety_first`, `handoff.started`, `error.generic`.
 
 ## Channel rendering
 - WhatsApp: summaries with YES / CHANGE / CANCEL quick-reply buttons; PIN and payment links as "Approve with PIN" / "Pay now" link buttons; vendor choices as a list; onboarding address via a location request (then confirm the street address).
@@ -64,4 +64,4 @@ Tax amounts in these samples are illustrative only. The real rules are [CONFIRM]
 - The model may only use registered tools. Money tools are gated in code (see docs/CONTRACTS.md, Agent tools).
 - Tool outputs are summarised for the model with only needed fields (no internal ids beyond refs, no other users' data).
 - Temperature low (≈0.2). Max 6 tool calls per user turn; on hitting the limit, ask the user or hand off.
-- Model responses pass an output filter: block phone numbers, emails of third parties, PIN/OTP-like strings, and any URL not on our allow-list (heydovo.com, checkout.stripe.com, provider tracking domains).
+- Model responses pass an output filter: block phone numbers, emails of third parties, PIN/OTP-like strings, and any URL not on our allow-list (heydovo.com, www.heydovo.com, checkout.stripe.com, provider tracking domains).

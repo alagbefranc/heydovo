@@ -17,7 +17,7 @@ Owns every order (delivery or pickup) and every trade booking from draft to comp
 - On `pin.verified` (bound ref, amount, hash must match) → `wallet.hold` → on success, plus `payment.succeeded` for any link part → CONFIRMED → start `OrderWorkflow`.
 - `OrderWorkflow`: notify vendor → wait accept (timeout → auto-cancel + release) → wait ready → book delivery or issue pickup code → wait delivered/collected → `wallet.capture` with splits → COMPLETED. Splits carry the tax lines, the delivery fee shown and the booked courier fee returned by `delivery.book`; a higher booked fee becomes the delivery subsidy line, never an extra charge to the user (docs/ALGORITHMS.md §3, §6).
 - `BookingWorkflow`: hold call-out fee → slot booked → status updates → final quote (new summary + YES + PIN if more) → capture → COMPLETED.
-- Cancellations and refunds per §12; send `refundCents` in `order.cancelled`; wallet executes.
+- Cancellations and refunds per §12: call `wallet.release` / `wallet.refund` by RPC. `order.cancelled` carries `refundCents` for information only; wallet never moves money from an event.
 - Vendor actions (portal or text via agent): accept, decline, substitution, ready, pickup code check, booking status, final quote.
 
 ## Events

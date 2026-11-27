@@ -5,7 +5,7 @@ Connects Hey Dovo to **Telnyx**, our single provider for messaging and voice: RC
 
 ## Owns (schema `messaging`)
 - `channel_accounts` (provider, channel rcs|sms|whatsapp|voice, sender number / RCS agent id / WhatsApp number, messaging_profile_id, enabled)
-- `inbound_messages` (id, provider_message_id UNIQUE, from_e164 NULLABLE, from_bsuid NULLABLE, channel, type text|button|list|location|media|flow, button_id, text_redacted, media_keys, received_at)
+- `inbound_messages` (id, provider_message_id UNIQUE, from_e164 NULLABLE, from_bsuid NULLABLE, channel, type text|button|list|location|media|flow, button_id, text_redacted, redaction_kinds, media_keys, received_at)
 - `outbound_messages` (id, idempotency_key UNIQUE, to_e164, channel_requested, channel_delivered (rcs|sms|mms|whatsapp), text_redacted, status, provider_message_id, error, sent_at, delivered_at)
 - `contact_channels` (phone_e164 NULLABLE, whatsapp_bsuid NULLABLE, last_inbound_channel, rcs_capable, whatsapp_window_expires_at = last inbound WhatsApp message + 24 h)
 - `opt_outs` (phone_e164, keyword, at)
@@ -40,10 +40,11 @@ Reply on the channel the user last wrote from (`contact_channels.last_inbound_ch
 ## Entry links (onboarding, marketing)
 - RCS: Telnyx RCS deep links (`sms:` with the RCS agent address) pre-filled with a start message and source tag.
 - SMS: `sms:<number>?body=…`. WhatsApp: `https://wa.me/<number>?text=…`.
-- QR codes on posters and in vendor shops point to `heydovo.com/start?src=…`, which opens the best link for the device. `apps/website` owns that route.
+- QR codes on posters and in vendor shops point to `heydovo.com/start?src=…`, which opens the best link for the device. `apps/website` owns that page (the apex redirects to `www.heydovo.com/start`).
+- A start message carries its source tag in one fixed shape, `(ref <tag>)`, with the tag matching `^[a-z0-9_-]{1,40}$`. The gateway strips it before publishing `message.received`, records it for attribution, and drops anything that does not match. The tag never reaches the model.
 
 ## Inbound pipeline
-Verify Telnyx webhook signature (Ed25519 signature + timestamp headers; reject stale timestamps) [CONFIRM header names] → dedupe on provider_message_id → mask secrets (docs/ALGORITHMS.md §15: cards by Luhn check; PIN/OTP candidates checked with `auth.checkSecretExposure`, 1 s timeout) → store redacted text and the list of redaction kinds → handle STOP/START/HELP (and ARRÊT/AIDE/REPRENDRE) → rate limit per number (e.g. 30 msgs/min) → update contact_channels → publish `message.received`. Ack Telnyx quickly and process async.
+Verify Telnyx webhook signature (Ed25519 signature + timestamp headers; reject stale timestamps) [CONFIRM header names] → rate limit per number (e.g. 30 msgs/min) → dedupe on provider_message_id → mask secrets in memory (docs/ALGORITHMS.md §15: cards by Luhn check; PIN/OTP candidates in one `auth.checkSecretExposure` call, 1 s in total, never retried) → store the redacted text and the redaction kinds → ack Telnyx → then handle STOP/START/HELP (and ARRÊT/AIDE/REPRENDRE), strip the source tag from a start message (see Entry links), update contact_channels and publish `message.received`. The raw webhook body is never written to a Queue, KV, Durable Object storage, logs or error reports; only the redacted message is. Keep the path up to the ack inside Telnyx's webhook time limit [CONFIRM limit].
 Media (photos): download to R2 (private), pass keys, never raw URLs.
 Keywords [CONFIRM]: that Telnyx supports custom opt-in/opt-out words (REPRENDRE, ARRÊT), and whether Telnyx or the carriers treat CANCEL, END or QUIT as opt-out words by default. CANCEL is our "cancel my order" shortcut and must reach the agent.
 
@@ -58,4 +59,4 @@ Consumes: message.send.
 - Call OpenAI or contain conversation logic. Store, log or queue unredacted PINs, OTPs or cards (candidate digits go only to `auth.checkSecretExposure`, in memory). Expose Telnyx keys. Send WhatsApp free-form messages outside the 24 h window.
 
 ## Tests
-Webhook signature (valid, forged, replayed/stale), dedupe, masking cases (digits that match the sender's PIN → redacted + reset; a typed OTP → redacted + cancelled; a bare house number and "buzzer code 4821" that match nothing → untouched; "my pin is 4821" that matches nothing → redacted, no reset; check unavailable or over the limit; Luhn card; "2 bags" and refs like D4821 untouched), RCS send with SMS fallback (rich + plain text both complete), WhatsApp window and template rules, button/list/location parsing, BSUID inbound and reply, template fallback to RCS/SMS on 40008, channel routing, opt-outs, idempotent sends, media to R2, voice tool webhook → agent session.
+Webhook signature (valid, forged, replayed/stale), dedupe, masking cases (digits that match the sender's PIN → redacted + RESET_REQUIRED; a typed OTP → redacted + cancelled; a bare house number and "buzzer code 4821" that match nothing → untouched; "my pin is 4821" that matches nothing → redacted, no reset; "yes 4821" while a PIN link is open; an open setup link or an unlinked BSUID → redacted with no comparison; a 4th candidate in one message; limit reached → redacted, no reset; the call failing or timing out; Luhn card; "2 bags" and refs like D4821 untouched; the raw body absent from queues, logs and error reports), source tag stripped from start messages, RCS send with SMS fallback (rich + plain text both complete), WhatsApp window and template rules, button/list/location parsing, BSUID inbound and reply, template fallback to RCS/SMS on 40008, channel routing, opt-outs, idempotent sends, media to R2, voice tool webhook → agent session.

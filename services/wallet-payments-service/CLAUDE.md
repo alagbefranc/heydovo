@@ -32,19 +32,29 @@ The ONLY service that moves money. Double-entry ledger, wallet top-ups, holds, c
 | `refund` | order-booking-service; admin-service (with the approvals the amount requires) |
 | `runPayouts`, `getLedger` | admin-service (payouts also run on this service's own weekly schedule) |
 | `getBalance` | agent-orchestrator, mcp-connector-service, order-booking-service, user-service (account closing), admin-service |
-| `createTopUpLink` | agent-orchestrator, mcp-connector-service, api-gateway for secure-pages (top-up page; the request carries a valid `topup` link token) |
-| `createConnectOnboardingLink` | api-gateway for vendor-portal (vendor owner role) |
+| `createTopUpLink` | agent-orchestrator, mcp-connector-service, api-gateway for secure-pages (top-up page) |
+| `createConnectOnboardingLink` | api-gateway for vendor-portal |
 
-- Implement this as one named entrypoint (`WorkerEntrypoint`) per caller, each exposing only that caller's methods and bound only to that caller in `wrangler.jsonc`. A Worker then cannot address a method it is not allowed to use.
-- The agent, the MCP connector and the web apps can never reach `hold`, `capture`, `release`, `refund` or payouts.
+The table is enforced in two places. On Workers the calling Worker's own config decides which entrypoint it binds, and this service cannot see who is calling, so a check inside this service alone is not enough.
+1. **Here**: one named `WorkerEntrypoint` class per caller, exposing only that caller's methods. Build them by composition; never extend a class that holds other callers' methods, because RPC exposes inherited methods. The default export has only `fetch`, for the Stripe webhook, and no RPC methods.
+2. **In `infra/`**: one list of which Worker may bind which entrypoint of this service. CI reads every Worker's `wrangler.jsonc` and fails on any binding that is not on the list. Changing the list needs the same manual approval as a wallet change.
+
+Rules for callers:
+- From api-gateway, methods take proof, not ids. `createTopUpLink({linkToken, amountCents})`: this service has auth-security resolve the `topup` link and takes the user from the answer. `createConnectOnboardingLink({vendorJwt})`: this service calls `verifyVendorSession` and requires the owner role with 2FA. That method decides where payouts go, so treat it as carefully as a money method.
+- From the agent and the MCP connector, `userId` always comes from the verified sender or the OAuth token, never from model output or tool arguments.
+- The agent, the MCP connector and the web apps never reach `hold`, `capture`, `release`, `refund` or payouts directly. Staff reach refunds and payouts only through admin-service, with its role checks, approvals and audit log.
 - Stripe webhooks arrive on this service's own public webhook route and are trusted only after signature verification.
+- Never widen a row to unblock a flow. Three flows described elsewhere have no method yet; add a narrow method to `packages/contracts` first (ask, as for any contract change):
+  - closing a wallet (docs/ALGORITHMS.md §6): proposed `closeWallet(userId, idempotencyKey)` for admin-service after an identity check, refunding only to the original top-up charges;
+  - vendor statements for the portal's Earnings page: proposed `getVendorStatement({vendorJwt, period})` for api-gateway;
+  - the pay-link page fetching its Checkout URL: proposed `getCheckoutUrl({linkToken})` for api-gateway.
 
 ## Events
 Publishes: payment.succeeded, payment.failed, wallet.topped_up, hold.created, hold.captured, hold.released, refund.issued, payout.sent, payout.failed, chargeback.opened.
 Consumes: none for money movement (money-moving commands come by RPC, only from the callers in the table above); dispute.resolved for reserves.
 
 ## Must never
-- Accept any method from a caller outside the allowed-caller table. Store card data. Update or delete ledger rows. Post unbalanced transactions.
+- Expose a method on an entrypoint whose caller is not in the allowed-caller table. Take a user or vendor id from api-gateway without proof. Store card data. Update or delete ledger rows. Post unbalanced transactions.
 
 ## Tests
-Property-based tests: ledger always balances; no double post under retries/concurrency; holds never exceed balance; capture splits add up to the hold (the delivery subsidy pair is extra and nets to zero); every method rejects callers outside the allowed-caller table; refunds never exceed captured; webhook replay/forgery; reconciliation mismatch detection; payout reserves; limits.
+Property-based tests: ledger always balances; no double post under retries/concurrency; holds never exceed balance; capture splits add up to the hold (the delivery subsidy pair is extra and nets to zero); each entrypoint exposes only its listed methods and nothing inherited; the default export has no RPC methods; gateway-facing methods reject a missing, expired or wrong-purpose token and a non-owner vendor session; refunds never exceed captured; webhook replay/forgery; reconciliation mismatch detection; payout reserves; limits.

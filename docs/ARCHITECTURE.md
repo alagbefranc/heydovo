@@ -27,7 +27,8 @@ Web apps → api-gateway Worker (behind Cloudflare WAF) → services
   admin-portal  (staff; Cloudflare Zero Trust Access + Supabase Auth + 2FA) → admin-service
 
 Public website (static, no API calls)
-  website       (heydovo.com: landing page, /start entry link, legal pages, security.txt)
+  website       (www.heydovo.com: landing page, /start entry link, legal pages, security.txt;
+                 the apex heydovo.com serves only /l/* and redirects everything else to www)
 
 Every service → Supabase Postgres (Canada), its own schema + role, via Hyperdrive
 ```

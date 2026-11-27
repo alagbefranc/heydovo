@@ -13,6 +13,7 @@ Single source of truth for every shape that crosses a boundary: RPC inputs/outpu
 
 ## Rules
 - zod for runtime validation; export inferred TS types.
+- Every RPC method is marked `internal` (the default) or `web-facing`. api-gateway routes only web-facing methods.
 - Versioning: add a new version alongside the old; never break a published version; deprecate with a date.
 - No runtime dependencies besides zod. 100% of schemas have tests (valid + invalid fixtures).
 - Changing anything here requires listing the affected producers and consumers in the PR.

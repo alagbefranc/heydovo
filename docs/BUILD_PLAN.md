@@ -31,7 +31,7 @@ In those cases, build and test against the typed fakes in `packages/sdk`, and li
 **Done when:** every client, fake and guard has tests, including the YES matcher allow/deny lists.
 
 ### Step 3 — `infra` (dev + staging)
-> Write Terraform for Cloudflare and Supabase as described in infra/CLAUDE.md for dev and staging only. Schemas and roles per service, extensions, Queues + DLQs, KV (seeded with the default settings), R2, Hyperdrive (one config per service role, query caching off), AI Gateway, DNS/email records and Worker routes for heydovo.com, WAF/rate limits, Zero Trust app for admin. Checkov clean.
+> Write Terraform for Cloudflare and Supabase as described in infra/CLAUDE.md for dev and staging only. Schemas and roles per service, extensions, Queues + DLQs, KV (seeded with the default settings), R2, Hyperdrive (one config per service role, query caching off), AI Gateway, DNS/email records, hostnames and Worker routes for heydovo.com, the service-binding allow-list with its CI check, WAF/rate limits, Zero Trust app for admin. Checkov clean.
 **Done when:** `terraform plan` is clean and applied to dev; each service role can only see its own schema (tested).
 
 ### Step 4 — `packages/ui` + `apps/website`
@@ -39,7 +39,7 @@ In those cases, build and test against the typed fakes in `packages/sdk`, and li
 **Done when:** Playwright + axe pass for every page (mobile + desktop, EN/FR); `/start` opens the right link per device; `security.txt` is valid; the site is live on dev.
 
 ### Step 5 — `services/api-gateway`
-> Build the gateway Worker: session checks (vendor and staff JWTs through auth-security, secure-page requests by link token), the `/api/<service>/<action>` routing table built from `packages/contracts`, zod body validation, rate limits (stricter on auth, PIN, OTP and payment routes), correlationId, CORS for our app origins only, security headers and the standard error shape. No business logic and no database. Services that do not exist yet are sdk fakes.
+> Build the gateway Worker: session checks (vendor and staff JWTs through auth-security, secure-page requests by link token), the `/api/<service>/<action>` routing table as an explicit allow-list of the methods `packages/contracts` marks as web-facing, zod body validation, rate limits (stricter on auth, PIN, OTP and payment routes), correlationId, CORS for our app origins only, security headers and the standard error shape. No business logic and no database. Services that do not exist yet are sdk fakes.
 **Done when:** routing, authz matrix, rate limits and error shape tested.
 
 ### Step 6 — `services/auth-security-service`
@@ -68,7 +68,7 @@ In those cases, build and test against the typed fakes in `packages/sdk`, and li
 
 ### Step 12 — `services/wallet-payments-service`
 > Tests first: ledger property tests, holds, capture splits (including the tax and delivery-subsidy lines), refunds, Stripe webhooks (test mode), limits, reconciliation, payouts Workflow and the allowed-caller table. Implement exactly per docs/ALGORITHMS.md §3, 6, 12, 13.
-**Done when:** property tests prove balance and no double posting under retries and concurrency; every method rejects callers outside its allowed-caller table.
+**Done when:** property tests prove balance and no double posting under retries and concurrency; each wallet entrypoint exposes only its caller's methods, and the CI binding check passes.
 
 ### Step 13 — `services/order-booking-service`
 > Tests first for the state machines. Build drafts with live price, stock and delivery re-checks, fees and summaryHash (docs/ALGORITHMS.md §3–5), `requestConfirmation`, the payment plan (wallet PIN link and/or payment link), `OrderWorkflow` and `BookingWorkflow`, vendor actions, pickup codes, substitutions, cancellations and refunds (§12).
