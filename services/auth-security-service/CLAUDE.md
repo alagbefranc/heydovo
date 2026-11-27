@@ -17,7 +17,7 @@ Everything about proving who someone is: phone OTP, transaction PIN, secure sing
 - PIN: weak-PIN rejection, peppered argon2id, constant-time verify, 5-attempt lock, reset via OTP. Pepper in Secrets Store. RESET_REQUIRED after an exposure in chat (§7): `verifyPin` refuses with `PIN_RESET_REQUIRED`, open `pin_approve` links are voided, and the new PIN must differ from the old one.
 - Secure links: 256-bit token, store sha256 only, purpose-bound, TTLs, single use, Turnstile on POST.
 - `verifyPin(token, pin)` for pin_approve → record a one-time approval and emit `pin.verified` with bound refType/refId/amount/summaryHash and the `approvalId` (docs/ALGORITHMS.md §8). `redeemApproval`, on its own entrypoint bound only by wallet-payments-service, answers yes once, before expiry, and only when every bound field matches; a retry with the same idempotencyKey gets the same answer.
-- `checkSecretExposure({sender, candidates})` (docs/ALGORITHMS.md §15) lives on its own named entrypoint, which only messaging-gateway binds (enforced by the binding allow-list in `infra/`), and is never routable from api-gateway. `sender` is exactly one of an E.164 number or a WhatsApp BSUID. Find the user through user-service (`getByPhone` / `getByBsuid`), then answer per candidate `pin`, `otp`, `none` or `unavailable` exactly as §15 defines, including the cases where no comparison is made and the limit of 5 non-matching comparisons per user per 24 h. A lookup failure or internal error is `unavailable`, never `none`. On `pin`, set RESET_REQUIRED straight away (do not wait for the event). On `otp`, cancel that code. Write each non-matching comparison to `security_events` without the digits. It never counts as a PIN attempt and never approves or unlocks anything.
+- `checkSecretExposure({sender, candidates})` (docs/ALGORITHMS.md §15) lives on its own named entrypoint, which only messaging-gateway and mcp-connector-service bind (enforced by the binding allow-list in `infra/`), and is never routable from api-gateway. `sender` is exactly one of an E.164 number or a WhatsApp BSUID. Find the user through user-service (`getByPhone` / `getByBsuid`), then answer per candidate `pin`, `otp`, `none` or `unavailable` exactly as §15 defines, including the cases where no comparison is made and the limit of 5 non-matching comparisons per user per 24 h. A lookup failure or internal error is `unavailable`, never `none`. On `pin`, set RESET_REQUIRED straight away (do not wait for the event). On `otp`, cancel that code. Write each non-matching comparison to `security_events` without the digits. It never counts as a PIN attempt and never approves or unlocks anything.
 - After a PIN reset (docs/ALGORITHMS.md §7): a 24-hour cap on wallet approvals ($50 in total by default), reported by `getSpendAllowance(userId)` and enforced in `createSecureLink` for `pin_approve` (`PIN_RESET_HOLD`). Before a reset, a SIM-change lookup through messaging-gateway (`lookupNumber`); a reported change blocks approvals completely for 72 hours by default and flags the account for staff review.
 - Action codes for the few SMS commands that need one (docs/ALGORITHMS.md §14: READY for a delivery order, PAUSE, a cancellation that costs the customer money, and any command during the step-up hour): `issueActionCode({phoneE164, action, refType?, refId?})` returns a 3-character code once and stores only its hash; `verifyActionCode({phoneE164, code})` returns the bound action and ref, single use, and counts wrong tries (5 in an hour → coded commands by SMS off for that number for an hour + alert). notification-service and agent-orchestrator issue codes; only agent-orchestrator verifies them.
 - Vendor/staff: validate Supabase JWTs, require 2FA (AAL2), resolve roles.
@@ -35,3 +35,35 @@ Weak PIN list, hashing + pepper, lockout and unlock, timing-safe compare, link e
 
 ## Fakes in use
 - user-service `getByPhone` / `getByBsuid` (for `checkSecretExposure`) until docs/BUILD_PLAN.md step 7.
+- messaging-gateway `lookupNumber` (the SIM-change check before a PIN reset) until docs/BUILD_PLAN.md step 8.
+
+## Added scope (designed 2026-11-27)
+Read docs/ALGORITHMS.md §17, §18, §20 and §24 as well.
+
+### Allowed callers
+Enforced like the wallet's table: one named entrypoint per caller, plus the CI check of service bindings in `infra/`.
+
+| Method | Allowed callers |
+|--------|-----------------|
+| `createSecureLink` for `pin_approve`, `track`; `getSpendAllowance` | order-booking-service |
+| `createSecureLink` for `topup`, `pay_link`; `redeemApproval`; `redeemStaffApprovals`; `verifyVendorSession` | wallet-payments-service |
+| `createSecureLink` for `setup`, `privacy`, `not_me`, `clients`; `startPinReset`; `verifyActionCode`; `getCommandPolicy`; `recordCommandSignal`; `freeze` (button token); `issueActionCode` | agent-orchestrator |
+| `issueActionCode`; `createSecureLink` for `not_me` (email copy) | notification-service |
+| `createSecureLink` for `muse_link`; `checkSecretExposure` | mcp-connector-service |
+| `checkSecretExposure` | messaging-gateway |
+| `startOtp` / `verifyOtp` for `vendor_staff_phone` | vendor-service |
+| `resolveLink`, `startOtp`, `verifyOtp`, `setPin`, `verifyPin`, `startPinReset` (from a locked approve page), `freeze` (link token) | api-gateway for secure-pages (the link token is the proof) |
+| `verifyStaffSession`, `verifyVendorSession`, `approveStaffAction`, `listBlocks`, `liftBlock` | api-gateway (the session is the proof) |
+| `redeemStaffApprovals` for `delivery_over_cap` | order-booking-service |
+| `requireReverification` | wallet-payments-service, admin-service |
+
+### Added data and logic
+- `pins` gains `pepper_version`. `action_codes` gains `button_token_hash` and `voided_at`. New: `command_guards` (phone_e164, step_up_until, coded_lock_until, wrong_codes, declines_streak, unknown_refs), `blocks` (id, subject_type, subject_id, kind, set_at, until, lifted_at, lifted_by, reason), `staff_approvals` (id, staff_id, action, ref_type, ref_id, amount_cents, expires_at, redeemed_at, redeem_key).
+- Actions: one record per recipient phone with a code and a button token; void every open action for an order and step on `order.*` / `booking.*`, and for a staff member on removal (§17).
+- Command state: `getCommandPolicy` and `recordCommandSignal`, with the step-up and coded-lock thresholds in config (§17).
+- Blocks: the table in §18 is the whole state machine. `freeze` from a `not_me` link or button; `liftBlock` verifies the staff session itself, needs a reason and the identity check result, and a second approval where §18 says so; the post-reset cap cannot be lifted. Emit `security.block_set` / `security.block_lifted`.
+- Staff approvals: `approveStaffAction` and `redeemStaffApprovals` exactly as §20.
+- Muse linking: OTP then PIN on the `muse_link` page; refuse while any block is active; the 24-hour cap for a newly linked client (§24).
+
+### Added tests
+Each row of the caller table (a method is not exposed on any other entrypoint); action codes and button tokens (right, wrong, reused, voided by an event, wrong phone); every row and column of the §17 command table; step-up and coded lock thresholds and expiry; every block in §18 (set, what it stops, how it ends, who may lift, second approval, the cap that cannot be lifted); a typed "not me" does nothing; staff approvals (same person twice, wrong amount, wrong ref, expired, reused, not enough for the amount); pepper rotation re-hash; Muse linking refused under each block.

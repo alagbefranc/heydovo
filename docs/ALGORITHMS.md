@@ -111,13 +111,14 @@ Double-entry. Every transaction's entries sum to zero (enforced by a deferred co
 - Verify with constant-time comparison. 5 consecutive failures → LOCKED (wallet spending blocked) → `pin.locked`. Unlock = OTP + set a new PIN.
 - RESET_REQUIRED (`pins.reset_required_at`), set when the PIN was exposed in chat (§15): `verifyPin` fails with `PIN_RESET_REQUIRED`, open `pin_approve` links are voided and wallet spending is blocked, exactly as for LOCKED. Cleared only by OTP + a new PIN that differs from the old one.
 - After any PIN reset (forgotten PIN, LOCKED or RESET_REQUIRED; not the first PIN at onboarding): for `config.postResetHoldHours` (default 24) wallet approvals are capped at `config.postResetCapCents` in total (default 5000 = $50). order-booking asks `auth.getSpendAllowance(userId)` when it builds a draft's payment plan, so the summary already shows the split; `createSecureLink` for `pin_approve` enforces the same limit and fails with `PIN_RESET_HOLD` above it. Anything over the cap is paid by payment link (split payment); pay-by-link is never affected. `pin.reset` triggers an alert by text (`pin.reset_alert`), and by email if one is on file, saying the PIN was changed and how to report it.
-- Before a reset, look up the number for a recent SIM change or port (Telnyx Number Lookup, through messaging-gateway, which owns the Telnyx integration [CONFIRM availability in Canada]). If the lookup reports one: wallet approvals are blocked completely for `config.simChangeHoldHours` (default 72 [CONFIRM]), a risk signal is raised and staff review the account. If the lookup is unavailable, the standard 24-hour cap applies.
+- Before a reset, look up the number for a recent SIM change or port (Telnyx Number Lookup, through messaging-gateway, which owns the Telnyx integration [CONFIRM availability in Canada]). If the lookup reports one: wallet approvals are blocked completely for `config.simChangeHoldHours` (default 72 [CONFIRM]), a risk signal is raised and staff review the account. If the lookup is unavailable, the standard 24-hour cap applies. How blocks end and who may lift them: §18.
+- The pepper can be rotated: `pins.pepper_version` records which pepper a hash used, and a successful verify with an old version re-hashes with the current one.
 - PIN never travels through chat, logs, analytics, AI or email. Only the secure page posts it, over TLS, directly to auth-security.
 
 ## 8. Secure links (auth-security-service)
 - Token: 32 random bytes, base64url. Store only `sha256(token)`.
-- Bound to: purpose (setup, pin_approve, pin_reset, topup, pay_link, track, privacy), userId, and for approvals refType + refId + amountCents + summaryHash.
-- TTL: pin_approve 10 min; setup, pin_reset, topup 30 min; track 7 days (read-only). Single use (except track).
+- Bound to: purpose (setup, pin_approve, pin_reset, topup, pay_link, track, privacy, not_me, muse_link, clients), userId, and for approvals refType + refId + amountCents + summaryHash.
+- TTL: pin_approve 10 min; setup, pin_reset, topup, muse_link, clients 30 min; not_me 72 hours; track 7 days (read-only). Single use (except track).
 - URL: `https://heydovo.com/l/{token}` (secure-pages). No personal data in the URL.
 - `resolveLink` returns only what the page must show (first name, order summary, amount).
 - Turnstile check on every POST from these pages.
@@ -170,7 +171,11 @@ An SMS sender number can be faked. So by SMS, and only for the commands that cos
 
 Customer cancellations follow the same idea (docs/CONTRACTS.md, `cancel` tool). After the refund amount is shown, the confirm button or a plain YES is enough when the refund is the full amount. Only when cancelling would cost the customer money (the refund is less than they paid) does a cancellation by SMS need `YES <code>` with the code from that message.
 
+Matching rules, the full command table, buttons, late replies, staff phones and who gets which message: §17.
+
 ## 15. Secret masking (messaging-gateway, with a check by auth-security)
+The same rules apply to captions, voice transcripts and Meta Muse tool arguments: §23.
+
 Runs in memory before any inbound text is stored, logged, queued or forwarded. Two goals: a real PIN, OTP or card number never reaches storage, logs or the AI; and an ordinary number (house number, buzzer code, quantity) does not force a PIN reset.
 
 **Order in the gateway**: verify signature → per-number rate limit → dedupe → mask in memory → store the redacted text → ack → publish. The raw webhook body is never written to a Queue, KV, Durable Object storage, logs or error reports. The path up to the ack must fit inside Telnyx's webhook time limit [CONFIRM limit].
@@ -208,3 +213,161 @@ Runs in memory before any inbound text is stored, logged, queued or forwarded. T
 ## 16. Identifiers shown to people
 - Order refs: prefix + 4–6 digits, unique per active period, mapped to the UUID internally.
 - Pickup codes: 6 characters from `ABCDEFGHJKMNPQRSTUVWXYZ23456789`, hashed at rest, single use, expire with the order. The code is sent only in the chat message when the order is ready (order-booking passes it once, in `order.ready`), is never shown on the tracking page, and is masked in the stored copy of that message.
+
+## 17. Vendor orders by text and in the dashboard (order-booking-service, agent-orchestrator, auth-security-service, notification-service)
+§14 lists the commands. This section says how typed text, buttons and the dashboard work as one.
+
+**One order state, several doors.** order-booking owns every order's state. The dashboard, a typed command and a button tap all end in the same RPC (`accept`, `decline`, `markReady`, `verifyPickupCode`; `pauseLocation` / `resumeLocation` on vendor-service) with `actor {kind: vendor, staffId, via: portal | sms | rcs | whatsapp}` and an idempotency key.
+- Text covers the frequent actions: accept, decline, ready, picked, pause, resume, help. Substitutions, booking status updates and final quotes are dashboard-only at launch [CONFIRM whether any should also work by text].
+- First action wins. The transition module decides. A second action on a step that is already finished gets `INVALID_TRANSITION` with the current state, and the person is told what happened: "D4821 was already accepted by Ama at 3:42 pm" (`vendor.already_done`).
+- A late reply is always answered, never ignored: "D4821 was cancelled at 3:50 pm because it was not accepted in time" (`vendor.late_reply`).
+- `status_events` records `via` and the staff member for every vendor action. The dashboard's order timeline shows it ("Accepted by Ama · by text · 3:42 pm"), and each staff member's activity log lists their text commands.
+
+**Actions (auth-security).** Every message that invites a vendor action creates one action record per recipient phone: `{id, phoneE164, action, refType, refId, codeHash, buttonTokenHash, expiresAt, usedAt, voidedAt}`. `issueActionCode` returns the code and the button token once; `verifyActionCode` accepts either.
+- `code`: 3 characters (§14). It is written in the message only when the step needs one by SMS (§14 and the table below). For those steps it is in the plain-text form even when the rich form has buttons, because an RCS message can fall back to SMS. For every other step the plain-text form just says the plain word to reply.
+- `buttonToken`: 128 random bits, carried as the button id (`va:<token>`) on WhatsApp and RCS. A tap counts only with a live token for that phone, so a button on an old alert cannot act on anything.
+- When a step ends by any door (dashboard, text, timeout, customer cancellation), every open action for that order and step is voided. auth-security does this from the `order.*` and `booking.*` events. In the gap before the event arrives, order-booking's transition check still refuses the second action.
+
+**Forgiving matching (packages/sdk `guards`, used by agent-orchestrator).** People type on phones.
+- Ignore case, accents, extra spaces and punctuation: `ready 4f9`, `READY-4F9` and `Ready: 4 F 9.` all match.
+- The code may come before or after the word. A message that is only a live code is enough: the code already names the action and the order.
+- English and French words: YES/OUI, NO/NON, READY/PRÊT, PICKED/REMIS, PAUSE, RESUME/REPRENDRE, HELP/AIDE [CONFIRM the French vendor words with a native speaker].
+- The code alphabet has no 0/O and no 1/I/L, so there is nothing to mix up. A typed code with a character outside the alphabet is a wrong code.
+- Anything that is not a command is not guessed at: answer with the short help text.
+
+**Re-prompt instead of rejecting.** A coded command sent without its code (`READY` for a delivery order, `PAUSE`, or any command during a step-up hour) is not an error and does not count as a wrong code. Answer with exactly what to send: "To mark D4821 ready, reply READY 4F9." This issues a fresh code and voids the old one. At most 3 re-prompts per order per hour; after that, point to the dashboard.
+
+**What each command needs**
+
+| Command | WhatsApp, and RCS once its sender is confirmed as verified | SMS (and RCS until confirmed) | SMS during a step-up hour | SMS during a coded-command lock |
+|---------|-------------------------------------------------------------|-------------------------------|---------------------------|---------------------------------|
+| YES / NO | button or plain word | plain word | code | plain word (off if a step-up hour is also running) |
+| READY, pickup order | button or plain word | plain word | code | plain word (off if a step-up hour is also running) |
+| READY, delivery order | button or plain word | code | code | off |
+| PAUSE | button, then a confirm tap | code | code | off |
+| RESUME | button or plain word | plain word | code | plain word (off if a step-up hour is also running) |
+| PICKED + pickup code | the customer's pickup code | the customer's pickup code | the customer's pickup code | the customer's pickup code |
+| HELP | always | always | always | always |
+
+- "Off" is answered once with `vendor.sms_locked`: "Text commands are paused for this number until 4:15 pm. Use the dashboard or WhatsApp."
+- 5 wrong pickup codes for one order → `PICKED` by text is off for that order, and staff are alerted.
+- PAUSE and RESUME: owner and manager only. Accept, decline, ready and picked: any staff member assigned to that location.
+- Where the state lives: auth-security keeps the per-number command state (`command_guards`: step-up until, coded-command lock until, wrong-code count). agent-orchestrator asks `auth.getCommandPolicy(phoneE164)` before acting on a vendor text, and reports each plain decline and each command for a ref that is not pending with `auth.recordCommandSignal`. The thresholds are auth-security config (three declines in a row within 30 minutes; five commands for refs that are not pending within an hour). The ConversationDO keeps no security state of its own.
+
+**A number that is both staff and customer.** A vendor staff member can also order groceries from the same phone. A message goes to the vendor parser only when it is a vendor button tap, carries a live vendor code or an order ref of that vendor, or is a vendor-only word (READY, PICKED, PAUSE, RESUME). A bare YES or NO goes to the vendor side when the number has a pending vendor order and no customer summary waiting, to the customer side in the opposite case, and when both are waiting Dovo asks which, with two buttons. Everything else is an ordinary customer conversation.
+
+**Staff phones (vendor-service).** A staff member adds their mobile in the dashboard while signed in with 2FA; auth-security texts an OTP to that phone (`startOtp`, purpose `vendor_staff_phone`); entering it in the dashboard sets `phone_verified`. One verified number belongs to one staff member at one vendor at a time [CONFIRM whether one person may work for two vendors]. Verify again when the number changes, after 90 days without a command, and after a staff-phone freeze (§18). Removing a staff member or their number voids their open actions at once.
+
+**Who gets which message.**
+- New order or booking: the on-duty list of the order's location (dashboard, Notification settings). Default: the owner and that location's managers; other staff opt in. Each recipient gets their own action record. A reminder goes to the same list at half the accept time. New-order alerts ignore quiet hours while the location is open.
+- Security messages (wrong codes, step-up, coded-command lock, store paused or resumed, payout account changed): the owner and the staff member whose number is involved, plus a review item for Hey Dovo staff when a lock or a step-up fires.
+- Payouts and statements: owner. Document expiry: owner and managers.
+
+**WhatsApp.** Outside the 24-hour window a vendor alert must be an approved template (services/messaging-gateway/CLAUDE.md lists them); inside it, an interactive message. A Decline tap is followed by a short reason list (Out of stock / Too busy / Closing soon / Other).
+
+## 18. Blocks, "this wasn't me" and staff review (auth-security-service, admin-service)
+auth-security owns every block on spending or commands, so there is one place to see them and one way to lift them.
+
+| Block | Set when | What it stops | How it ends |
+|-------|----------|---------------|-------------|
+| LOCKED | 5 wrong PINs | wallet approvals | the owner: OTP + new PIN |
+| RESET_REQUIRED | the PIN was exposed in chat (§15) | wallet approvals | the owner: OTP + new PIN |
+| Post-reset cap | any PIN reset (§7) | wallet approvals above $50 in total | after 24 hours. Staff cannot shorten it |
+| SIM-change block | the number lookup reports a recent SIM change or port (§7) | all wallet approvals | after 72 hours it becomes the post-reset cap; staff may lift it earlier after the identity check [CONFIRM] |
+| Frozen | the owner says "this wasn't me"; staff; a lost chargeback (§21) | wallet approvals, PIN reset, address and profile changes, new Muse links. Orders by payment link still work | staff only, after the identity check |
+| Step-up hour | unusual plain commands by SMS (§14) | plain commands by SMS (a code is needed) | after 1 hour; staff may lift it earlier |
+| Coded-command lock | 5 wrong codes in an hour (§14) | coded commands by SMS | after 1 hour; staff may lift it earlier |
+| Staff phone frozen | a vendor says "this wasn't me" | every text command from that number | the staff member verifies the phone again in the dashboard, or staff lift it |
+
+**"This wasn't me."** Messages about a security-relevant change give the person a way to say it was not them: PIN changed, a Muse client linked, store paused or resumed by text, payout account changed, a coded-command lock.
+- On WhatsApp and RCS: a "This wasn't me" button. On SMS and in the email copy: a link to a secure page with one button (link purpose `not_me`, valid 72 hours, single use). The link proves they hold the phone or the mailbox. There is no typed command, because a typed "not me" could be faked to freeze somebody else.
+- Customer: the account is Frozen at once, open approval links and approvals are voided, the conversation is handed to staff, and a `not_me` review item is opened.
+- Vendor: that staff phone is frozen, the owner is alerted, and a review item is opened.
+- A freeze only makes things stricter, so it needs no PIN.
+
+**Review queue (admin-service).** `review_items (id, kind, subject_type, subject_id, opened_by, reason, status open|in_review|resolved, assignee, sla_due_at, resolution, created_at, resolved_at)`. Kinds: `sim_change`, `not_me`, `vendor_command_lock`, `exposure_limit`, `chargeback`, `delivery_over_cap`, `wallet_close_remainder`, `erasure_overdue`. Default SLA: `not_me` and `sim_change` 4 business hours [CONFIRM]; `chargeback` 3 days before Stripe's evidence deadline; `delivery_over_cap` 10 minutes.
+
+**Lifting a block.** Staff lift a block from its review item. The request carries the staff member's own session straight to auth-security (`liftBlock`), which verifies the session and role itself, requires a reason and the result of the identity check, writes `security_events` and emits `security.block_lifted`. Lifting Frozen, or a SIM-change block before its 72 hours, needs a second staff member (§20). The post-reset cap cannot be lifted. Every lift is in the admin audit log, and the owner is told by text and email.
+
+**Identity check** [CONFIRM the list with operations and the lawyer]: things the phone alone cannot prove, for example the amount and card last four digits of the latest top-up, a recent order, and a link sent to the email on file.
+
+## 19. Delivery quotes: validity, re-quote and the absorb cap (delivery-service, order-booking-service)
+An Uber Direct quote lives for a short time (about 15 minutes [CONFIRM]); a summary can be confirmed for 30 minutes (§4); and the courier is booked when the order is ready, often later still. So the fee is checked three times.
+1. **Draft.** Get a quote. Fee shown = quote fee adjusted by `config.deliveryFeeAdjustmentBps` (default 0), rounded half up. Store the quote id and when it expires.
+2. **Confirmation** (`requestConfirmation`). If the quote has expired, get a new one. If the new fee shown would be higher than the old one by more than `config.deliveryAbsorbCapCents` (default 500 = $5.00 [CONFIRM]) → `SUMMARY_CHANGED`, and the user gets a new summary with the new fee. Otherwise the fee shown stays.
+3. **Booking** (`order.ready`). Create the delivery with a fresh quote. The user's fee never changes at this point.
+   - Booked fee no more than the fee shown plus the cap → book. The difference goes through `delivery_subsidy_expense` (§3, §6).
+   - Over the cap → re-quote up to 2 more times over 5 minutes, since prices move. Still over → do not book automatically: open a `delivery_over_cap` review item and tell the customer there is a short delay. Staff choose: approve the higher fee (audited), switch to vendor self-delivery if enabled, or offer the customer pickup with the delivery fee refunded. If nobody decides within `config.overCapDecisionMinutes` (default 10), book anyway so the order is not left waiting, and flag it [CONFIRM].
+- A lower booked fee is kept (§3).
+- [CONFIRM] Booking the courier when the vendor accepts, with a scheduled pickup time, would fix the fee earlier, at the risk of courier waiting fees when the vendor is late. Default: book at ready.
+
+## 20. Who may refund, and the proof it carries (wallet-payments-service, auth-security-service)
+A refund always goes back to where the money came from (the user's wallet, or the card that paid) and never exceeds what was held or captured for that order.
+
+| Refund | Decided by | Proof the wallet requires |
+|--------|-----------|---------------------------|
+| Rule-based: a cancellation under §12, vendor decline, auto-cancel, a delivery the courier reports as failed, a refused substitution | order-booking | the order ref and a reason kind. Bounded by the held or captured amount, idempotent per (ref, reason, item) |
+| Decided by a person: a dispute outcome, goodwill, anything outside the §12 rules | staff | staff approval ids: one below `config.refundTwoPersonThresholdCents` [CONFIRM value], two from different staff members at or above it |
+
+**Staff approvals.** A staff member approves in the admin portal. That request goes through api-gateway straight to auth-security (`approveStaffAction`), which verifies the session itself (2FA, role finance or support) and records an approval bound to the staff member, the action (`refund`, `lift_block`, `chargeback_evidence`, `delivery_over_cap`), the ref and the amount. It is valid for 24 hours and single use. admin-service (or order-booking, for a dispute outcome) passes only the approval ids on. The wallet calls `auth.redeemStaffApprovals(ids, {action, refType, refId, amountCents}, idempotencyKey)`; auth-security says yes only if every id is live, bound to exactly this refund, from different staff members, and enough of them for the amount. admin-service never handles a staff session token for an approval, so a fault in admin-service cannot mint one.
+
+## 21. Chargebacks (wallet-payments-service, admin-service)
+1. Stripe `charge.dispute.created` → the wallet records the case, emits `chargeback.opened`, and reserves the disputed amount: for a disputed top-up, that much of the user's balance cannot be spent, and if the balance is lower the account is Frozen (§18) [CONFIRM policy].
+2. admin-service opens a `chargeback` review item, due 3 days before Stripe's evidence deadline.
+3. Evidence pack, gathered by admin-service through each owning service's API and stored in R2 (private): the order summary and the user's confirmation; the PIN approval record (approval id and time) or the paid Checkout session; the consent versions (terms, privacy, refunds); when the phone was verified; delivery proof from the courier or the verified pickup code; the redacted conversation excerpt; refunds already given. Only what the case needs.
+4. A finance staff member reviews it and submits through `wallet.submitChargebackEvidence({caseId, evidenceKeys, approvalIds})` with one staff approval (§20). The wallet sends it to Stripe.
+5. Outcome (`charge.dispute.closed`): won → release the reserve. Lost → post `chargeback_loss`, recover from the reserve where there is a balance, and apply the account policy [CONFIRM, for example no more top-ups by card, payment links only].
+
+## 22. Deleting a user's data, and keeping nothing too long (every service; user-service coordinates)
+**Erasure.** A deletion request or a closed account ends with `user.closed {userId, mode}`. Every service that holds personal data consumes it, erases or anonymises its part, and answers `privacy.erasure_completed {userId, service}`. user-service tracks the answers against the table below and the 30-day deadline. An answer still missing after 7 days opens an `erasure_overdue` review item.
+
+| Service | Erase | Keep, and why |
+|---------|-------|---------------|
+| user-service | name, addresses, preferences, BSUID links | a tombstone with the user id and closing date; consent records (proof of consent) |
+| messaging-gateway | message text, media keys, contact_channels | opt-outs as a hash of the number (STOP must keep working); message metadata without text until it ages out |
+| agent-orchestrator | Durable Object state, summaries and agent logs for that user | nothing |
+| auth-security | PIN hash, links, OTPs, approvals, actions | security events without personal detail (fraud prevention) |
+| order-booking | names and address snapshots, once the dispute and chargeback windows have passed | order, amounts and status history under the user id only (financial records) |
+| wallet-payments | nothing personal is stored beyond ids | ledger and payment records (financial records) |
+| delivery | drop-off snapshots and courier notes | delivery id, fee, status |
+| reviews-disputes | the link between a review and its author (the text stays, shown as from a former customer, unless it holds personal data); dispute messages | dispute outcome |
+| notification | log entries, push subscriptions, email address | nothing |
+| mcp-connector | linked clients and tokens, revoked at once | nothing |
+| analytics | nothing by name: the pseudonym can no longer be linked once user-service erases the user | pseudonymised facts |
+| R2 | photos and evidence tied to the user, once the dispute and chargeback windows have passed | nothing |
+
+- A legal hold (an open dispute, chargeback or fraud review) pauses erasure of the affected records only, and the user is told [CONFIRM with the lawyer].
+- Before closing: a zero wallet balance or `closeWallet` started (§6), and no open orders.
+- Outside our systems: ask processors to delete where their terms allow (Telnyx message logs, the Stripe customer, OpenAI and AI Gateway logs) [CONFIRM each provider's controls].
+
+**Retention.** Each service runs a daily job for its own data, and tests it.
+- Conversations (message text, media, agent logs, AI Gateway logs, Durable Object history): 12 months from the message, then deleted.
+- OTPs, used or expired links, and actions: 30 days. Security events: 24 months [CONFIRM].
+- Logs and traces (Workers Logs, Logpush, Sentry): 90 days at most. They already hold no secrets and no message bodies.
+- Financial records: 7 years [CONFIRM]. Vendor documents: until 12 months after the vendor closes [CONFIRM].
+- Backups age out on the provider's schedule; erased data can remain in a backup until then, and the Privacy Policy says so.
+
+## 23. Masking beyond chat text, and the reply filter
+The detection rules and decision table of §15 live in one shared module (packages/sdk `masking`), used at every door a person's words come through. The exposure check (`auth.checkSecretExposure`) may be called by messaging-gateway and mcp-connector-service only.
+- **Captions and other text fields.** An image or document caption, a location label, a contact card and any free text on a button reply are masked exactly like a message body.
+- **Photos.** A photo can show a card or a written PIN. Photos stay in R2 (private) and go to the model only for repairs and order problems; the model is told never to read numbers out of a photo. No OCR at launch [CONFIRM].
+- **Voice** (step 21). Everything Telnyx Voice AI passes to us, transcript text and tool arguments, is masked in the voice adapter before it is stored or forwarded. Spoken digits are normalised first, in English and French ("four eight two one", "quatre huit deux un"). A match is handled as in §15. The Telnyx assistant is instructed never to ask for a PIN, an OTP or a card number; call recording is off, and Telnyx-side transcript retention is set to the minimum [CONFIRM Telnyx controls].
+- **Meta Muse** (step 22). Every string argument of every tool call is masked in mcp-connector before it is logged or passed on. The sender is the linked user.
+
+**Reply filter (agent-orchestrator).** It applies to model-written text only; templates are code and are not filtered. It has to stop a leaked secret without breaking ordinary numbers.
+- Build an allow-set for the turn: digits found in the user's own messages that passed §15 as ordinary numbers, in tool results (addresses, refs, totals, times, distances) and in the user's saved profile.
+- Always allowed by shape: money (`$34.47`, `34,47 $`), times and dates, order refs (a letter, then digits), quantities with a unit (`500 g`, `2 x`), and Hey Dovo's own number.
+- A standalone run of 4 to 8 digits passes only if it is in the allow-set or has an allowed shape. Digits right after a secret word (pin, nip, otp, code, password) are blocked whatever they are.
+- Other phone numbers, third-party emails and URLs off the allow-list stay blocked.
+- On a block: regenerate once, telling the model what was removed. Blocked again → send `error.generic` and offer a human. Never send a reply with a hole in it.
+
+So "Deliver to 1250 Main St, unit 4821?" passes, and "your PIN is 4821" never does.
+
+## 24. Linking Meta Muse (mcp-connector-service, auth-security-service, secure-pages)
+- Linking happens on our secure page, never inside Muse: phone OTP, then the wallet PIN. Both are needed, so a stolen code alone cannot link an account. A user with no PIN yet finishes onboarding first.
+- No linking while the account is LOCKED, RESET_REQUIRED, Frozen, under a SIM-change block, or inside the 24 hours after a PIN reset.
+- When a client is linked, the owner is told by text and email, with "This wasn't me" (§18). For the first 24 hours, wallet approvals started from that client count against the same $50 cap as after a PIN reset.
+- Tokens: short-lived access tokens, rotating refresh tokens, scopes `read` (search, track, balance) and `order` (drafts, confirm, cancel, top-up). Unused for 90 days → revoked. The owner can list and unlink clients on a secure page, or by texting UNLINK.
+- Links never go to Muse. `confirm_order`, `confirm_booking` and `create_topup_link` make Dovo text the PIN, payment or top-up link to the owner's own phone, and return only a status ("I sent a confirmation link to the phone ending in 21. It expires in 10 minutes."). The secure page shows the summary again; approving there with the PIN, or paying, is the explicit YES of golden rule 8. A "yes" given inside Muse is never consent on its own.
+- `cancel` from Muse: a cancellation with a full refund can be confirmed in Muse. One that would cost the customer money is confirmed through a texted link.
+

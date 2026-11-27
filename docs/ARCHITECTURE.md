@@ -96,7 +96,7 @@ Unknown number → user-service creates a pending user → agent collects langua
 Calls to the Hey Dovo number go to Telnyx Voice AI, which handles speech; its tool webhooks call messaging-gateway's voice adapter, which forwards to the same agent-orchestrator tools. Spoken YES confirms a summary; the PIN link is always texted. Never charge on voice alone.
 
 ### Meta Muse
-mcp-connector-service exposes MCP tools that call the same service APIs, with the same confirmation and PIN rules. Accounts link through OAuth with phone OTP.
+mcp-connector-service exposes MCP tools that call the same service APIs, with the same confirmation and PIN rules. Accounts link through OAuth with phone OTP and the wallet PIN on our secure page, and PIN or payment links are texted to the owner's phone, never returned to Muse (docs/ALGORITHMS.md §24).
 
 ## Storage
 - Supabase Postgres (Canada): schema per service, role per service, RLS as defence in depth. PostGIS, pgvector, full-text search (English + French). Through Hyperdrive, query caching is off unless a read path is named as cacheable, and RLS settings are transaction-local (docs/SECURITY.md, Platform).

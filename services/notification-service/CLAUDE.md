@@ -25,3 +25,9 @@ Publishes: message.send.
 
 ## Tests
 Template rendering (EN/FR, missing vars fail), consent gating, quiet hours, email headers (SPF/DKIM alignment in staging), push delivery, idempotency, vendor alerts (buttons on WhatsApp/RCS, plain replies by text, a reply code only where §14 requires one), PIN-reset email alert.
+
+## Added scope (designed 2026-11-27)
+- Vendor alerts go to the recipients from `vendor.getAlertRecipients` (docs/ALGORITHMS.md §17), one action record each, with a reminder at half the accept time. New-order alerts ignore quiet hours while the location is open.
+- Security emails carry a `not_me` link (docs/ALGORITHMS.md §18): PIN changed, Muse client linked, account frozen or unfrozen, payout account changed.
+- Erasure consumer (docs/ALGORITHMS.md §22).
+- Added tests: recipients per location, one action per recipient, the reminder, the PIN-reset email with its link, erasure.

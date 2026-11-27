@@ -55,3 +55,28 @@ Security first. Follow OWASP Top 10, OWASP API Security Top 10 and OWASP Top 10 
 ## Logging
 - Structured JSON logs with correlationId; no PINs, OTPs, tokens, full card numbers, full addresses or message bodies in logs (use redacted forms).
 - Audit log (append-only) for every admin action and every money movement.
+
+## Added requirements (designed 2026-11-27; details in docs/ALGORITHMS.md §17–24)
+
+### Approvals, callers and blocks
+- A refund decided by a person carries staff approval ids that the wallet redeems with auth-security itself: one below the two-person threshold, two from different staff members at or above it. Rule-based refunds are bounded by the held or captured amount and go only back to the payer (§20).
+- auth-security has its own allowed-caller table (its CLAUDE.md), enforced like the wallet's: per-caller entrypoints plus the CI check of service bindings.
+- auth-security owns every block (PIN lock, reset required, post-reset cap, SIM-change block, Frozen, vendor command locks). Staff lift a block only through `liftBlock`, which verifies the staff session itself; the post-reset cap cannot be lifted (§18).
+- "This wasn't me" is a button on WhatsApp and RCS, and a secure link on SMS and email. It is never a typed command.
+
+### Every door for a person's words is masked
+- Captions, location labels, contact cards, voice transcripts and tool arguments from Telnyx Voice AI, and every string argument from Meta Muse go through the same masking as a text message (§23). One shared module, no second implementation.
+- The reply filter allows real addresses, totals and refs and still blocks secret-looking and invented numbers (§23).
+
+### Meta Muse
+- Linking needs phone OTP and the wallet PIN on our secure page, is refused while any block is active, and starts with a 24-hour $50 cap. PIN, payment and top-up links are texted to the owner's own phone and never returned to Muse (§24).
+
+### Infrastructure
+- No database role password, API token or other secret may appear in Terraform state, plan output or CI logs. Role passwords and Hyperdrive origin credentials are set by a rotation job outside Terraform (or by write-only arguments where the provider has them [CONFIRM]); Terraform holds only names and ids. State is remote, encrypted, locked and readable by CI and two named people only. A CI check scans plan output for secret-shaped values.
+- Rotation: database role passwords and provider API tokens every 90 days and at once after any suspected leak; webhook secrets yearly; the PIN pepper on a planned schedule using `pepper_version` (docs/ALGORITHMS.md §7). Each rotation has a runbook, and one full rotation is rehearsed before launch.
+- Backups: Supabase point-in-time recovery on every production database [CONFIRM plan]; R2 versioning for vendor documents and evidence; a restore is rehearsed in staging at step 3 and again as a timed drill before launch against the recovery targets [CONFIRM targets; default: lose at most 5 minutes of data, be back within 4 hours].
+- Monitoring from step 3: error rate and latency per Worker, Queue backlog and dead-letter depth, Workflow failures, webhook signature failures, payment and payout failures, ledger and courier reconciliation mismatches, AI Gateway spend, message delivery failure rate, security events (locks, freezes, step-ups) and uptime checks on every `/health`. Alerts go to a named on-call contact [CONFIRM tool and who is on call].
+
+### Privacy operations
+- Erasure reaches every service and is tracked to completion; retention jobs delete conversations after 12 months (§22).
+- Before launch (docs/LAUNCH.md): a privacy impact assessment covering transfers outside Canada and Quebec (OpenAI, Telnyx, Stripe, Uber, Cloudflare), a named privacy officer, data processing terms with each processor, a breach response runbook (who decides, notifying the OPC, Quebec's CAI and the people affected, the incident register), rehearsed once as a tabletop exercise.

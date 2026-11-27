@@ -30,7 +30,7 @@ The ONLY service that moves money. Double-entry ledger, wallet top-ups, holds, c
 | Method | Allowed callers |
 |--------|-----------------|
 | `hold`, `capture`, `release`, `createPaymentLink` | order-booking-service |
-| `refund` | order-booking-service; admin-service (with the approvals the amount requires) |
+| `refund` | order-booking-service (rule-based refunds; a dispute outcome carries staff approval ids); admin-service (always with staff approval ids). docs/ALGORITHMS.md §20 |
 | `runPayouts`, `getLedger` | admin-service (payouts also run on this service's own weekly schedule) |
 | `getBalance` | agent-orchestrator, mcp-connector-service, order-booking-service, user-service (account closing), admin-service |
 | `createTopUpLink` | agent-orchestrator, mcp-connector-service, api-gateway for secure-pages (top-up page) |
@@ -45,10 +45,10 @@ Rules for callers:
 - From the agent and the MCP connector, `userId` always comes from the verified sender or the OAuth token, never from model output or tool arguments.
 - The agent, the MCP connector and the web apps never reach `hold`, `capture`, `release`, `refund` or payouts directly. Staff reach refunds and payouts only through admin-service, with its role checks, approvals and audit log.
 - Stripe webhooks arrive on this service's own public webhook route and are trusted only after signature verification.
-- Never widen a row to unblock a flow. Three flows described elsewhere have no method yet; add a narrow method to `packages/contracts` first (ask, as for any contract change):
-  - closing a wallet (docs/ALGORITHMS.md §6): proposed `closeWallet(userId, idempotencyKey)` for admin-service after an identity check, refunding only to the original top-up charges;
-  - vendor statements for the portal's Earnings page: proposed `getVendorStatement({vendorJwt, period})` for api-gateway;
-  - the pay-link page fetching its Checkout URL: proposed `getCheckoutUrl({linkToken})` for api-gateway.
+- Never widen a row to unblock a flow. If a flow has no method, add a narrow one to `packages/contracts` first (ask, as for any contract change). These three are now defined (docs/CONTRACTS.md, "Added contracts"):
+  - closing a wallet (docs/ALGORITHMS.md §6): `closeWallet` for user-service (the owner's own request, with a `privacy` link token as proof) and for admin-service (with a staff approval). It refunds only to the original top-up charges, so it cannot send money anywhere new; what cannot go back to a card becomes a `wallet_close_remainder` review item;
+  - vendor statements for the portal's Earnings page: `getVendorStatement({vendorJwt, period, format})` for api-gateway (owner role; JSON or CSV);
+  - the pay-link page fetching its Checkout URL: `getCheckoutUrl({linkToken})` for api-gateway (`pay_link` and `topup` links; a new Checkout session is created if the old one expired).
 
 ## Events
 Publishes: payment.succeeded, payment.failed, wallet.topped_up, hold.created, hold.captured, hold.released, refund.issued, payout.sent, payout.failed, chargeback.opened.
@@ -59,3 +59,11 @@ Consumes: none for money movement (money-moving commands come by RPC, only from 
 
 ## Tests
 Property-based tests: ledger always balances; no double post under retries/concurrency; holds never exceed balance; no wallet hold without a redeemed approval (missing, expired, reused, wrong amount, wrong user); capture splits add up to the hold (with the delivery subsidy line in both directions, so `delivery_payable` always equals the booked fee); each entrypoint exposes only its listed methods and nothing inherited; the default export has no RPC methods; gateway-facing methods reject a missing, expired or wrong-purpose token and a non-owner vendor session; refunds never exceed captured; webhook replay/forgery; reconciliation mismatch detection; payout reserves; limits.
+
+## Added scope (designed 2026-11-27)
+- Refund proof (docs/ALGORITHMS.md §20): rule-based refunds from order-booking need a reason kind and are bounded by the held or captured amount; any refund decided by a person needs staff approval ids, redeemed with auth-security before anything moves.
+- `closeWallet`, `getVendorStatement` and `getCheckoutUrl` as in the allowed-caller notes above and docs/CONTRACTS.md.
+- Chargebacks (docs/ALGORITHMS.md §21): record the case, reserve the disputed amount, `getChargebackCase`, `submitChargebackEvidence` with one staff approval, outcomes and ledger postings.
+- Amounts paid and fees per vendor per quarter for the yearly seller report (docs/LAUNCH.md) [CONFIRM with the accountant].
+- Erasure: answer `privacy.erasure_completed`; ledger and payment records stay (financial records).
+- Added tests: a person-decided refund with no, one, two, repeated, expired or mismatched approvals; a rule-based refund above the captured amount; wallet closing (refunds only to original top-up charges, remainder becomes a review item, refused with open holds); statements only for the vendor's own owner; a Checkout URL only for a live `pay_link` or `topup` token; chargeback reserve, evidence submission and both outcomes.

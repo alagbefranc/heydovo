@@ -30,7 +30,22 @@ Hey Dovo is a conversational agent. The chat has to feel smooth for customers an
 11. Restricted items (alcohol, cannabis, tobacco, weapons, prescription drugs) are refused politely unless admin enables a category with age checks.
 
 ## Message templates (keys live in packages/contracts/src/templates, EN + FR)
-- `summary.product`, `summary.booking`, `confirm.pin_link`, `confirm.pay_link`, `order.confirmed`, `order.accepted`, `order.ready_pickup`, `delivery.picked_up`, `delivery.arriving`, `order.delivered`, `booking.on_the_way`, `booking.final_quote`, `order.cancelled`, `refund.issued`, `wallet.low_balance`, `pin.locked`, `pin.reset_alert`, `pin.reset_hold`, `cancel.confirm`, `secret.exposed_warning`, `secret.otp_in_chat`, `secret.reminder`, `secret.number_hidden`, `emergency.safety_first`, `handoff.started`, `error.generic`.
+- `summary.product`, `summary.booking`, `confirm.pin_link`, `confirm.pay_link`, `order.confirmed`, `order.accepted`, `order.ready_pickup`, `delivery.picked_up`, `delivery.arriving`, `order.delivered`, `booking.on_the_way`, `booking.final_quote`, `order.cancelled`, `refund.issued`, `wallet.low_balance`, `pin.locked`, `pin.reset_alert`, `pin.reset_hold`, `cancel.confirm`, `secret.exposed_warning`, `secret.otp_in_chat`, `secret.reminder`, `secret.number_hidden`, `emergency.safety_first`, `handoff.started`, `error.generic`, plus the customer and vendor keys added in docs/CONTRACTS.md ("Added contracts").
+
+## Vendor conversation
+Vendors run their orders by text while the dashboard shows the same orders (docs/ALGORITHMS.md §14 and §17). Their messages are templates and a deterministic parser, never the model.
+- One message per event, short, with the action in it: buttons on WhatsApp and RCS, and the typed reply always written out for SMS.
+- Every command is answered: what was done, or what already happened ("D4821 was already accepted by Ama at 3:42 pm").
+- A command that needs a code and came without one is answered with exactly what to send, never with an error.
+- If a number is both staff and customer and a bare YES could mean either, ask which with two buttons.
+
+> Dovo: New order D4821 · Garri 2 kg ×2, Palm Oil 1 L · $25.47 · delivery. Accept within 10 min. [Accept] [Decline]  (SMS: Reply YES or NO)
+> Vendor: yes
+> Dovo: D4821 accepted. When it is ready, reply READY 4F9. [Mark ready]
+> Vendor: ready
+> Dovo: To mark D4821 ready, reply READY 7KQ.
+> Vendor: ready 7kq
+> Dovo: D4821 is marked ready. A courier is on the way.
 
 ## Channel rendering
 - WhatsApp: summaries with YES / CHANGE / CANCEL quick-reply buttons; PIN and payment links as "Approve with PIN" / "Pay now" link buttons; vendor choices as a list; onboarding address via a location request (then confirm the street address).
@@ -72,4 +87,4 @@ Tax amounts in these samples are illustrative only. The real rules are [CONFIRM]
 - The model may only use registered tools. Money tools are gated in code (see docs/CONTRACTS.md, Agent tools).
 - Tool outputs are summarised for the model with only needed fields (no internal ids beyond refs, no other users' data).
 - Temperature low (≈0.2). Max 6 tool calls per user turn; on hitting the limit, ask the user or hand off.
-- Model responses pass an output filter: block phone numbers, emails of third parties, PIN/OTP-like strings, and any URL not on our allow-list (heydovo.com, www.heydovo.com, checkout.stripe.com, provider tracking domains).
+- Model responses pass a reply filter (docs/ALGORITHMS.md §23): it blocks phone numbers other than ours, emails of third parties, digits that follow a secret word, any other 4 to 8 digit run that is not in the turn's allow-set (the user's own ordinary numbers, tool results, the saved profile) or an allowed shape (money, time, date, order ref, quantity), and any URL not on our allow-list (heydovo.com, www.heydovo.com, checkout.stripe.com, provider tracking domains). Addresses and totals pass; an invented or secret-looking number does not.

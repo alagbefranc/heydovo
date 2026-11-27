@@ -67,7 +67,7 @@ Change the schema first, version it, and keep old versions working until every c
 
 ## Sync APIs (RPC methods)
 - **user-service**: `getByPhone`, `getByBsuid`, `getById`, `createPending`, `updateProfile`, `addAddress` (geocodes, checks served area), `listAddresses`, `setDefaultAddress`, `recordConsent`, `getOnboarding`, `setOnboardingStep`, `exportData`, `closeAccount`.
-- **auth-security-service**: `createSecureLink({purpose, userId, refType?, refId?, amountCents?, summaryHash?})`, `resolveLink(token)`, `startOtp(phone, purpose)`, `verifyOtp`, `setPin(token, pin, pinConfirm)`, `verifyPin(token, pin)`, `startPinReset`, `getSpendAllowance(userId)`, `redeemApproval(approvalId, bound, idempotencyKey)` (wallet only), `issueActionCode`, `verifyActionCode`, `verifyStaffSession(jwt)`, `verifyVendorSession(jwt)`, `requireReverification(userId, reason)`, `checkSecretExposure({sender, candidates})` (internal, on its own entrypoint bound only by messaging-gateway; `sender` is exactly one of `e164` or `bsuid`; answers per candidate `pin`, `otp`, `none` or `unavailable`, where a rate limit, lookup failure or internal error is `unavailable`, never `none`; docs/ALGORITHMS.md §15).
+- **auth-security-service**: `createSecureLink({purpose, userId, refType?, refId?, amountCents?, summaryHash?})`, `resolveLink(token)`, `startOtp(phone, purpose)`, `verifyOtp`, `setPin(token, pin, pinConfirm)`, `verifyPin(token, pin)`, `startPinReset`, `getSpendAllowance(userId)`, `redeemApproval(approvalId, bound, idempotencyKey)` (wallet only), `issueActionCode`, `verifyActionCode`, `verifyStaffSession(jwt)`, `verifyVendorSession(jwt)`, `requireReverification(userId, reason)`, `checkSecretExposure({sender, candidates})` (internal, on its own entrypoint bound only by messaging-gateway and mcp-connector-service; `sender` is exactly one of `e164` or `bsuid`; answers per candidate `pin`, `otp`, `none` or `unavailable`, where a rate limit, lookup failure or internal error is `unavailable`, never `none`; docs/ALGORITHMS.md §15).
 - **vendor-service**: `apply`, `getVendor`, `updateProfile`, `getUploadUrl`, `reviewDocument`, `setStatus`, `listCandidates({point, kind, category?, fulfilment?, at})`, `getAvailability(vendorId, range)`, `holdSlot`, `releaseSlot`, `getStaffByPhone(phoneE164)`, `getPayoutAccount`.
 - **catalogue-quotes-service**: `searchProducts({query, userPoint, fulfilment, limit})`, `searchServices({need, category?, userPoint, at, emergency})`, `getProducts(ids)` (current price/stock), `upsertProduct`, `bulkUpload`, `upsertService`, `createQuoteRequest`, `submitQuote`, `acceptQuote`, `getRankingWeights(category)`.
 - **order-booking-service**: `createDraft({userId, vendorId, items, fulfilment, addressId?, deliveryQuoteId?})`, `updateDraft`, `requestConfirmation(draftId, summaryHash)`, `createBookingDraft`, `requestBookingConfirmation`, `getStatus(refId)`, `cancel(refId, by, reason)`, `switchFulfilment`; vendor actions `accept`, `decline`, `proposeSubstitution`, `markReady`, `verifyPickupCode`, `updateBookingStatus`, `submitFinalQuote`.
@@ -104,3 +104,38 @@ Every tool has a strict JSON schema in `packages/contracts/src/agent-tools`. The
 | handoff_to_human | emits handoff.requested | always allowed |
 
 No tool moves money directly. `confirm_order` only starts the PIN or payment-link step. `get_balance` and `create_topup_link` are the only wallet methods the agent can reach.
+
+## Added contracts (designed 2026-11-27; details in docs/ALGORITHMS.md §17–24)
+Build these in `packages/contracts` with everything above. Each is `internal` unless marked web-facing.
+
+**RPC methods**
+- **auth-security-service** (allowed callers for every method: the table in its CLAUDE.md):
+  - `issueActionCode` returns `{code, buttonToken}`; `verifyActionCode({phoneE164, code? | buttonToken?})` (§17).
+  - `getCommandPolicy(phoneE164)` → `{codesRequiredUntil?, codedLockUntil?, frozen}`; `recordCommandSignal({phoneE164, kind: plain_decline | unknown_ref})` (§17).
+  - `approveStaffAction({action, refType, refId, amountCents?})` (web-facing, admin portal; the staff session is the proof) → `approvalId`; `redeemStaffApprovals(approvalIds, bound, idempotencyKey)` (§20).
+  - `listBlocks(subject)`, `liftBlock({blockId, reason, identityCheck, approvalIds?})` (web-facing, admin portal), `freeze({linkToken | buttonToken})` (§18).
+  - `startOtp` gains the purposes `vendor_staff_phone` and `muse_link`.
+- **wallet-payments-service**: `closeWallet({userId, proof: linkToken | approvalIds, idempotencyKey})` → `{refundedCents, remainderCents}`; `getVendorStatement({vendorJwt, period, format})` (web-facing); `getCheckoutUrl({linkToken})` (web-facing); `refund` gains `reasonKind` and `approvalIds?` (§20); `getChargebackCase(caseId)`, `submitChargebackEvidence({caseId, evidenceKeys, approvalIds})` (§21).
+- **vendor-service**: `startStaffPhoneVerification`, `confirmStaffPhone` (web-facing, vendor portal); `getAlertRecipients({locationId, kind})`; `pauseLocation` / `resumeLocation` (with `actor.via`); seller tax details for platform reporting (docs/LAUNCH.md).
+- **order-booking-service**: every vendor action takes `actor {kind, staffId, via}`; `decideDeliveryOverCap({orderId, decision: approve | self_delivery | offer_pickup, approvalIds})` (§19).
+- **delivery-service**: `quote` returns `expiresAt`; the booked fee comes back from `book` (§19).
+- **admin-service**: review items (`listReviewItems`, `assignReviewItem`, `resolveReviewItem`), chargeback evidence gathering, the delivery subsidy report, the yearly seller report (docs/LAUNCH.md).
+- **user-service**: erasure tracking per service (§22).
+- **mcp-connector-service**: linked clients (`listClients`, `unlinkClient`), reached from a secure page with a `clients` link token.
+
+**Events**
+| Event | Producer | Main consumers | Key data |
+|-------|----------|----------------|----------|
+| security.block_set / security.block_lifted | auth-security | agent, admin-service, notification | subjectType (user, staff_phone), subjectId, kind, until?, liftedBy? |
+| privacy.erasure_completed | every service with personal data | user-service | userId, service |
+| wallet.closed | wallet | user-service, notification | userId, refundedCents, remainderCents |
+| chargeback.closed | wallet | admin, reviews-disputes | caseId, outcome (won, lost), amountCents |
+| client.linked / client.unlinked | mcp-connector | agent, notification, auth-security | userId, clientName |
+| delivery.over_cap | order-booking | admin-service, agent | orderId, feeShownCents, bookedQuoteCents |
+
+`user.closed` gains `mode` (delete, anonymise). `order.*` and `booking.*` are also consumed by auth-security, to void open vendor actions.
+
+**Templates (EN + FR, typed variables)**
+- Customer: `account.frozen`, `account.unfrozen`, `security.not_me_link`, `muse.linked`, `muse.link_sent`, `delivery.short_delay`, `pin.reset_alert`, `pin.reset_hold`, `cancel.confirm`, and the five `secret.*` keys.
+- Vendor: `vendor.new_order`, `vendor.new_booking`, `vendor.order_reminder`, `vendor.accepted_ready_prompt`, `vendor.code_reprompt`, `vendor.already_done`, `vendor.late_reply`, `vendor.order_cancelled`, `vendor.pause_confirm`, `vendor.paused`, `vendor.resumed`, `vendor.step_up`, `vendor.sms_locked`, `vendor.wrong_code`, `vendor.help`, `vendor.which_do_you_mean`, `vendor.payout_sent`, `vendor.document_expiring`.
+- Every vendor template has a rich form (buttons) and a complete plain-text form that states the typed reply.

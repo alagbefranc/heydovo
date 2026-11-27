@@ -15,3 +15,7 @@ Single entry point (`/api/*`) for the three web apps that call the API: secure-p
 
 ## Tests
 Routing table coverage (including a test that no internal method is routable), authz matrix (vendor A cannot reach vendor B; staff roles), rate-limit behaviour, schema rejection, error shape.
+
+## Added scope (designed 2026-11-27)
+- `approveStaffAction`, `listBlocks` and `liftBlock` go from the admin portal straight to auth-security with the staff session unchanged; `getVendorStatement`, `getCheckoutUrl`, `createTopUpLink` and `createConnectOnboardingLink` go to the wallet with their proof (link token or vendor session). A session token is never forwarded to any other service.
+- Routes for the new secure pages: `not_me`, `muse_link`, `clients`.

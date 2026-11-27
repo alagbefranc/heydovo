@@ -57,7 +57,7 @@ The conversation is the product. Keep every customer and vendor flow as low-fric
 - `packages/` contracts, sdk, ui, config
 - `templates/` worker (the Worker template every service starts from)
 - `infra/` Terraform, Wrangler configs, CI
-- `docs/` ARCHITECTURE, CONTRACTS, ALGORITHMS, CONVERSATION, SECURITY, TESTING, BUILD_PLAN
+- `docs/` ARCHITECTURE, CONTRACTS, ALGORITHMS, CONVERSATION, SECURITY, TESTING, BUILD_PLAN, LAUNCH (the non-code launch track), OPEN_ITEMS
 
 ## Business constants (defaults; editable in admin settings)
 - Customer service fee: $2.50 per order (250 cents). Delivery fee: the courier fee quoted in the summary; the customer pays exactly that, never more (the platform absorbs increases and keeps decreases) [CONFIRM wording with lawyer]. Pickup: no delivery fee.

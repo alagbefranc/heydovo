@@ -29,3 +29,11 @@ Consumes: review.created, order.accepted/declined/completed (stats), booking.con
 
 ## Tests
 PostGIS candidate queries (radius edges, polygons, timezones, closures, DST), document expiry job, slot hold races, RLS isolation (portal scope sees only its own vendor; nothing set returns no rows and no error, including right after another transaction used the connection; internal scope is reachable only from the internal data module; the service role cannot bypass the policies; the interleaved-requests test runs in staging through real Hyperdrive, because local Hyperdrive is a direct connection), upload validation (type, size), approval flow.
+
+## Added scope (designed 2026-11-27)
+- Staff phones (docs/ALGORITHMS.md §17): add and verify a mobile in the dashboard with an OTP from auth-security; one verified number per staff member; verify again when it changes, after 90 days without a command, and after a staff-phone freeze. Publish staff changes so auth-security voids open actions.
+- Alert recipients: an on-duty list per location (default: the owner and that location's managers; staff opt in). `getAlertRecipients({locationId, kind})` for notification-service.
+- `pauseLocation` / `resumeLocation` take `actor.via`; owner and manager only.
+- Seller details for platform reporting (docs/LAUNCH.md) [CONFIRM with the accountant before building]: legal name, address, tax number, and date of birth for individuals. The tax number is encrypted at field level and visible to the finance role only.
+- Erasure and retention for vendor staff data and documents (docs/ALGORITHMS.md §22).
+- Added tests: phone verification (right and wrong OTP, a number already used by another staff member, re-verification rules), recipients per location and kind, role limits on pause and resume, tax number never readable outside the finance role.

@@ -29,3 +29,9 @@ Consumes: auth.phone_verified, pin.set, messaging.opted_out/in, auth.reverify_re
 
 ## Tests
 Onboarding state transitions, verified-condition logic, geocode + served-area (inside, outside, edge), consent versioning, close/anonymise, export completeness, RLS/role isolation.
+
+## Added scope (designed 2026-11-27)
+- Erasure coordinator (docs/ALGORITHMS.md §22): `user.closed` with `mode`, track `privacy.erasure_completed` from every service in the table, open an `erasure_overdue` review item after 7 days, respect legal holds, and answer the request within 30 days.
+- Closing an account: `wallet.closeWallet` with the owner's `privacy` link token as proof; no open orders.
+- While an account is Frozen (`security.block_set` / `security.block_lifted`), refuse address and profile changes.
+- Tests: erasure tracked to completion and overdue, a legal hold, the frozen flag.

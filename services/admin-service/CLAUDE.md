@@ -26,3 +26,13 @@ Consumes: handoff.requested, dispute.*, chargeback.opened, payout.failed, health
 
 ## Tests
 Role matrix for every endpoint, audit entries for every write, two-person approval, flag evaluation rules, settings validation and cache refresh.
+
+## Added scope (designed 2026-11-27)
+- Review queue (docs/ALGORITHMS.md §18): `review_items`, opened from `security.block_set`, `chargeback.opened`, `delivery.over_cap`, wallet closing remainders and overdue erasures, with deadlines and assignment.
+- Lifting a block and approving a refund are done by the staff member's own session against auth-security (`liftBlock`, `approveStaffAction`); this service only records the review item and the audit entry, and passes approval ids on. It never handles a staff session token for an approval.
+- Chargebacks (docs/ALGORITHMS.md §21): gather the evidence pack through each owning service's API, store it in R2, submit through the wallet.
+- Delivery subsidy report: net of `delivery_subsidy_expense` by day and month, by city and vendor, orders over the cap, and the `deliveryFeeAdjustmentBps` and `deliveryAbsorbCapCents` settings (docs/ALGORITHMS.md §19).
+- Erasure tracking view and legal holds (docs/ALGORITHMS.md §22).
+- Yearly seller report and a copy per vendor, if the accountant confirms it applies (docs/LAUNCH.md).
+- New settings: `deliveryAbsorbCapCents`, `deliveryFeeAdjustmentBps`, `overCapDecisionMinutes`, `refundTwoPersonThresholdCents`, `postResetCapCents`, `postResetHoldHours`, `simChangeHoldHours`, the command thresholds.
+- Added tests: each review kind opens, is assigned and resolves; a lift or refund attempted through this service without valid approvals fails at auth-security or the wallet; the subsidy report matches ledger fixtures; evidence pack contents.

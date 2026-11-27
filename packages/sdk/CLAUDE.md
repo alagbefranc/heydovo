@@ -10,3 +10,8 @@ Typed clients for calling services: Workers RPC over service bindings (internal)
 - Includes a shared `guards` module (confirmation guard, YES matcher, cancel guard with the SMS reply code) used by agent-orchestrator and mcp-connector-service so rules are never duplicated.
 - Fakes validate their inputs and outputs against `packages/contracts`, so a fake cannot drift from the real contract. Fakes are for tests only and are never bundled into a deployed Worker.
 - Tests for every client, every fake and the guards.
+
+## Added scope (designed 2026-11-27)
+- `guards`: forgiving vendor command matching and reply-code handling (docs/ALGORITHMS.md §17): case, accents, spaces and punctuation ignored; code before or after the word; a live code alone is enough; English and French words. Exhaustive allow and deny tables, as for the YES matcher.
+- `masking`: the detection rules and decision table of docs/ALGORITHMS.md §15, as one module used by messaging-gateway (text, captions, voice) and mcp-connector-service (tool arguments). Includes spoken-digit normalisation in English and French (§23). No service keeps its own copy.
+- Fakes for the methods under "Added contracts" in docs/CONTRACTS.md.

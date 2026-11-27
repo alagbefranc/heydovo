@@ -29,3 +29,11 @@ Consumes: pin.verified, payment.succeeded, payment.failed, delivery.*, quote.acc
 
 ## Tests
 Every allowed and forbidden transition, Workflow timeouts and retries, price change between summary and confirm, duplicate/out-of-order events, split payment, pickup code, substitution, every cancellation point with correct refund amount, booking final-quote path.
+
+## Added scope (designed 2026-11-27)
+- One state, several doors (docs/ALGORITHMS.md §17): every vendor action takes `actor {kind, staffId, via}`; `status_events` gains `via` and `staff_id`; first action wins, and the loser gets `INVALID_TRANSITION` with the current state, who acted, how and when, so the caller can answer a late reply.
+- Delivery quotes (docs/ALGORITHMS.md §19): re-quote at confirmation and at booking, the absorb cap, `delivery.over_cap`, `decideDeliveryOverCap` with a staff approval, and booking anyway after the decision time.
+- The pickup code leaves this service once, in `order.ready` for pickup orders; only its hash is stored.
+- A dispute-outcome refund passes the staff approval ids from `dispute.resolved` to the wallet (docs/ALGORITHMS.md §20).
+- Erasure consumer: names and address snapshots after the dispute and chargeback windows (docs/ALGORITHMS.md §22).
+- Added tests: two staff acting at once through different doors, a reply after timeout, the over-cap paths (re-quote succeeds, staff approve, self-delivery, pickup offer, nobody decides), the split payment after a PIN reset, the pickup code absent from every stored field and every event except `order.ready`.

@@ -9,7 +9,7 @@ The brain of the conversation. One Durable Object per customer phone number hold
 
 ## Flow per inbound message
 1. Consume `message.received` → route to the DO.
-2. Pre-checks (code, before any LLM): vendor staff number? → vendor command parser (docs/ALGORITHMS.md §14; plain YES/NO where the risk is low, buttons on WhatsApp and RCS, and by SMS a one-time reply code, checked with `auth.verifyActionCode`, only for the commands that cost money or stop the store). Answer every command with a short confirmation to the registered phone. Emergency keywords → `emergency.safety_first` template first. Redactions listed on the message → the matching `secret.*` template first (docs/ALGORITHMS.md §15). STOP/HELP handled by gateway. Human takeover active → forward to admin and stop.
+2. Pre-checks (code, before any LLM): vendor staff number and a vendor message (docs/ALGORITHMS.md §17, "A number that is both staff and customer")? → vendor command parser (docs/ALGORITHMS.md §14; plain YES/NO where the risk is low, buttons on WhatsApp and RCS, and by SMS a one-time reply code, checked with `auth.verifyActionCode`, only for the commands that cost money or stop the store). Answer every command with a short confirmation to the registered phone. Emergency keywords → `emergency.safety_first` template first. Redactions listed on the message → the matching `secret.*` template first (docs/ALGORITHMS.md §15). STOP/HELP handled by gateway. Human takeover active → forward to admin and stop.
 3. Load user (user-service). Unknown or unverified → onboarding flow (docs/ALGORITHMS.md §10).
 4. Build prompt: fixed system prompt + rolling summary + recent turns + untrusted-wrapped content. Call OpenAI with strict tool schemas, low temperature.
 5. Execute tool calls through the tool registry: each entry = schema, target RPC, guard. Guards are enforced here in code.
@@ -38,3 +38,13 @@ Per-user and global budgets, rate limits, logging on. Response caching OFF for c
 
 ## Tests
 Tool registry contract tests, guard tests (no summary, stale summary, changed hash, "yes?" vs "yes", injection text claiming the user said yes), vendor command parser (plain commands, the two coded commands by SMS, buttons on WhatsApp/RCS, the step-up after unusual declines, the confirmation reply), cancellation by SMS with a full and a partial refund, onboarding paths, handoff, French, voice session, redaction templates, output filter, and the AI evaluation suite (docs/TESTING.md).
+
+## Added scope (designed 2026-11-27)
+Read docs/ALGORITHMS.md §17, §18, §23 and §24 as well.
+- Vendor commands: matching from packages/sdk `guards`; ask `auth.getCommandPolicy` before acting; report plain declines and unknown refs with `auth.recordCommandSignal`; re-prompt a coded command that came without its code; answer every command, including late ones, from the state order-booking returns; the "which do you mean" question for a number that is both staff and customer. No security state in the Durable Object.
+- "This wasn't me": a button tap calls `auth.freeze`; on SMS send the `not_me` link. A typed "not me" is ordinary text. While an account is Frozen: no wallet payment plans, no address or profile changes, offer a payment link and a human.
+- `UNLINK` keyword for Meta Muse clients.
+- Reply filter exactly as docs/ALGORITHMS.md §23 (allow-set, allowed shapes, regenerate once, never a reply with a hole).
+- Erasure consumer and daily retention job for Durable Object state, summaries and agent logs (docs/ALGORITHMS.md §22).
+- English and French copy for every new template, and evals for every new flow: each redaction kind, the cap and split payment after a PIN reset, a frozen account, cancellation with a full and a partial refund, the vendor flows by button and by text, late replies, the dual-role question, a delivery delay, Muse-started confirmation.
+- Added tests: the reply filter (address with a unit number, postal code, totals, times, an invented number, digits after "PIN"), the dual-role routing table, frozen-account behaviour, re-prompt limits.

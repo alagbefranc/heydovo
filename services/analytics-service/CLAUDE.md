@@ -17,3 +17,7 @@ Consumes: all business events (fan-out subscription). Publishes: none.
 
 ## Tests
 Pseudonymisation, metric calculations on fixtures, late/duplicate events, retention jobs.
+
+## Added scope (designed 2026-11-27)
+- Metric: net delivery subsidy and orders over the absorb cap (docs/ALGORITHMS.md §19).
+- Erasure: nothing to erase by name; answer `privacy.erasure_completed` so user-service can close the request (docs/ALGORITHMS.md §22).

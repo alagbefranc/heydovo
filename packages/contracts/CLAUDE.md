@@ -17,3 +17,8 @@ Single source of truth for every shape that crosses a boundary: RPC inputs/outpu
 - Versioning: add a new version alongside the old; never break a published version; deprecate with a date.
 - No runtime dependencies besides zod. 100% of schemas have tests (valid + invalid fixtures).
 - Changing anything here requires listing the affected producers and consumers in the PR.
+
+## Added scope (designed 2026-11-27)
+- Everything under "Added contracts" in docs/CONTRACTS.md: the new RPC methods, events and templates, each method marked `internal` or `web-facing`.
+- Every vendor template has two forms with the same variables: rich (buttons) and complete plain text that states the typed reply, in English and French.
+- `actor` on vendor actions carries `via` (portal, sms, rcs, whatsapp).

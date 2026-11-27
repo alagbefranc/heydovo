@@ -33,3 +33,9 @@ Consumes: none directly (order-booking calls `book`/`cancel`).
 
 ## Tests
 Uber Direct adapter contract tests against its sandbox, selection rule cases (written against the interface with fake providers, so a second provider can be added later), timeout and outage fallback to self-delivery and pickup, quote expiry + fee absorb, webhook verification/dedupe/out-of-order, cancellation.
+
+## Added scope (designed 2026-11-27)
+- Quotes carry `expiresAt` [CONFIRM how long an Uber Direct quote is valid]. order-booking re-quotes at confirmation and at booking (docs/ALGORITHMS.md §19); this service just answers honestly: a fresh quote each time, never a cached one.
+- The absorb cap and the over-cap decision belong to order-booking. This service reports the quote and the booked fee.
+- Erasure: drop-off snapshots and courier notes for a closed user (docs/ALGORITHMS.md §22).
+- Added tests: expired quote refused at booking, fresh quote returned, booked fee reported, erasure.

@@ -28,3 +28,9 @@ BrandHeader, OrderSummaryCard, AmountDisplay, PinPad, OtpInput, ConsentCheckbox,
 
 ## Tests
 Playwright for every route on mobile + desktop (WebKit, Chromium, Firefox), EN/FR, axe AA, expired/used/tampered tokens, PIN errors/lockout, Stripe test-mode flows, CSP violations = test failure.
+
+## Added scope (designed 2026-11-27)
+- New link purposes (docs/ALGORITHMS.md §18, §24): **Not me** (one button that freezes the account or the staff phone, then what happens next), **Muse link** (OTP → wallet PIN → what the client may do → done), **Clients** (list linked clients, unlink).
+- PIN approve for an order started from Meta Muse shows the full summary and an explicit Approve step before the PinPad: this page is where the YES happens.
+- A Frozen account sees a clear state on every page, with how to reach support.
+- Added tests: the PIN reset page shows the 24-hour notice; the tracking page never shows a pickup code, for any order type or state; the not-me link works once and expires; Muse linking is refused under each block; unlinking revokes at once.

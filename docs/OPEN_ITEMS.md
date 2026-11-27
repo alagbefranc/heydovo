@@ -31,14 +31,18 @@ Search the repo for `[CONFIRM]` too. Resolve these before the related build step
 - Telnyx webhook time limit (the secret-masking check must finish before the ack).
 - SIM-change lookup: Telnyx Number Lookup availability in Canada, and the block length after a reported change (default 72 hours).
 - RCS: whether the sender of an inbound RCS message is verified (decides whether RCS commands need a reply code).
+- Delivery: the absorb cap per order (default $5.00), what happens when nobody decides on an over-cap order (default: book after 10 minutes), and whether to book the courier at acceptance instead of at ready (docs/ALGORITHMS.md §19).
+- Blocks: the support identity check; whether a SIM-change block ends by itself after 72 hours; whether lifting a freeze needs two staff; review deadlines (docs/ALGORITHMS.md §18).
+- Refunds: the amount from which a refund needs two approvals; chargeback account policy (docs/ALGORITHMS.md §20, §21).
+- Vendors: default alert recipients (owner and managers); whether one person may be staff at two vendors; which roles may pause a store; French vendor words; whether substitutions should also work by text (docs/ALGORITHMS.md §17).
+- Retention: security events 24 months, vendor documents 12 months after closing, financial records 7 years, legal holds (docs/ALGORITHMS.md §22).
+- Voice: Telnyx-side recording and transcript retention controls. Photos: no OCR at launch (docs/ALGORITHMS.md §23).
+- Operations: monitoring tool and on-call, recovery targets, Supabase plan with point-in-time recovery, production accounts (docs/LAUNCH.md).
+- CRA reporting for digital platform operators: whether it applies, and what to collect from vendors (docs/LAUNCH.md).
+- Terraform: whether the Cloudflare and Supabase providers support write-only secret arguments (docs/SECURITY.md).
 
 ## Security design items raised in review
-These came out of the independent security review of this pack. They are weaknesses in the original design that have not been changed yet. Decide each one before the build step named.
-Decided on 2026-11-27 and written into the docs: a spending hold after a PIN reset, PIN approvals that the wallet redeems itself, reply codes by SMS only for the commands that cost money or stop the store, and no pickup code on the tracking page.
-- The two-person refund rule lives only in admin-service; `wallet.refund` carries no evidence of the approvals (steps 12, 19).
-- auth-security has no allowed-caller table of its own: any Worker that binds it can create secure links for any user, start a PIN reset or require re-verification (step 6).
-- On SMS the sender's phone number is the identity for chat, and it can be faked. The commands that cost money or stop a store need a reply code. By choice (low friction), plain accept and decline, RESUME, address changes, disputes and reviews do not; they rely on the confirmation message, the dashboard and the step-up rule (steps 8, 16).
-- Secret masking covers text messages only, not voice transcripts, MCP tool arguments or photo captions (steps 16, 21, 22).
-- Meta Muse account linking uses phone OTP only, and PIN links are returned to the MCP client (step 22).
-- Terraform-managed Hyperdrive configs and database roles put role passwords in Terraform state, against the infra rule (step 3).
-- The agent's output filter blocks PIN/OTP-like strings, but an address with a 4–6 digit number has to be confirmed back to the user (step 16).
+Decided or designed on 2026-11-27 and written into the docs: the spending hold after a PIN reset; PIN approvals that the wallet redeems itself; reply codes by SMS only for commands that cost money or stop the store; no pickup code on the tracking page; staff approval proof on refunds; an allowed-caller table for auth-security; masking for captions, voice and Meta Muse arguments; Meta Muse linking with OTP and PIN, with links texted to the phone; no secrets in Terraform state; a reply filter that lets real addresses through.
+
+Accepted by choice, to keep the conversation low-friction:
+- On SMS the sender's phone number is the identity for chat, and it can be faked. The commands that cost money or stop a store need a reply code. Plain accept and decline, RESUME, address changes, disputes and reviews do not; they rely on the confirmation message, the dashboard and the step-up rule (steps 8, 16).

@@ -19,3 +19,7 @@ Consumes: order.completed, booking.completed (eligibility), chargeback.opened.
 
 ## Tests
 Eligibility windows, single review per order, moderation, SLA timers, outcome → refund event, access control (users see own, vendors see theirs).
+
+## Added scope (designed 2026-11-27)
+- A resolution that refunds is a decision by a person: `resolveDispute` records the staff approval ids (one, or two at or above the threshold) and carries them in `dispute.resolved` (docs/ALGORITHMS.md §20).
+- Erasure consumer (docs/ALGORITHMS.md §22).

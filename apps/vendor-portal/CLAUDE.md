@@ -18,3 +18,11 @@ AppShell, StatCard, OrderInboxList, OrderCard (accept/decline countdown), Status
 
 ## Tests
 Playwright per page (mobile + desktop, EN/FR, axe AA), role matrix, realtime arrival, accept timeout UI, bulk upload errors, document upload limits, 2FA enforcement.
+
+## Added scope (designed 2026-11-27)
+- Phone: add and verify the mobile used for text commands (Security page). Team page shows which staff have a verified phone.
+- Notification settings: the on-duty list per location (docs/ALGORITHMS.md §17).
+- Order and job timelines show who did each step and how ("Accepted by Ama · by text · 3:42 pm"). The activity log lists text commands. If text commands are paused for a number, the Security page says so and until when.
+- A short "Running orders by text" help page: the commands, when a code is needed, and that text and the dashboard are the same orders.
+- Earnings uses `wallet.getVendorStatement` (owner only). Seller tax details form if the accountant confirms it is needed (docs/LAUNCH.md).
+- Added tests: an action taken by text appears in the open dashboard without a reload; two people acting at once; phone verification; statements hidden from non-owners.

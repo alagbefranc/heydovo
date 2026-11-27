@@ -15,3 +15,8 @@ Reuse AppShell, StatCard, DataTable, Charts from `packages/ui`, plus Conversatio
 
 ## Tests
 Playwright per page, role matrix, two-person refund flow, flag toggles, takeover send/receive, audit entries appear.
+
+## Added scope (designed 2026-11-27)
+- New pages: Review queue (with the block, the identity check and the lift or approve action), Chargebacks (case, evidence checklist, submit), Delivery subsidy (net, over-cap orders, the two settings), Erasure requests.
+- Approving a refund or lifting a block is a staff action sent with the staff member's own session to auth-security; where a second person is needed, the page says who approved first and blocks the same person from approving twice.
+- Added tests: the review queue per role, the two-person flows, the over-cap decision within its time limit.
