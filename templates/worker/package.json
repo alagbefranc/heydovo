@@ -1,0 +1,24 @@
+{
+  "name": "@heydovo/worker-template",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy:dev": "wrangler deploy --env dev",
+    "typecheck": "wrangler types --include-runtime=false --check && tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "types": "wrangler types --include-runtime=false"
+  },
+  "dependencies": {
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "1.8.5",
+    "@cloudflare/workers-types": "5.20261120.1",
+    "@heydovo/config": "workspace:*",
+    "vitest": "5.1.1",
+    "wrangler": "4.165.0"
+  }
+}

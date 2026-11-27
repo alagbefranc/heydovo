@@ -1,0 +1,27 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Copy this template to start a service. Rename `name`, SERVICE_NAME and the entrypoint classes.
+  "name": "heydovo-worker-template",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  // No usage telemetry from Wrangler for this project.
+  "send_metrics": false,
+  // workers.dev is off by default; only the dev environment below turns it on for the /health check.
+  "workers_dev": false,
+  "vars": {
+    "SERVICE_NAME": "worker-template",
+    "ENVIRONMENT": "local",
+  },
+  "env": {
+    "dev": {
+      "name": "heydovo-worker-template-dev",
+      "workers_dev": true,
+      "vars": {
+        "SERVICE_NAME": "worker-template",
+        "ENVIRONMENT": "dev",
+      },
+    },
+  },
+}

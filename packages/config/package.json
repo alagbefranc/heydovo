@@ -1,0 +1,44 @@
+{
+  "name": "@heydovo/config",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./eslint": "./eslint.mjs",
+    "./prettier": "./prettier.mjs",
+    "./vitest": {
+      "types": "./vitest.d.mts",
+      "default": "./vitest.mjs"
+    },
+    "./playwright": {
+      "types": "./playwright.d.mts",
+      "default": "./playwright.mjs"
+    },
+    "./tsconfig/base.json": "./tsconfig/base.json",
+    "./tsconfig/worker.json": "./tsconfig/worker.json"
+  },
+  "scripts": {
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint-config-prettier": "10.1.8",
+    "globals": "17.14.0",
+    "typescript-eslint": "8.73.0"
+  },
+  "peerDependencies": {
+    "@playwright/test": "1.63.0",
+    "eslint": "10.15.0",
+    "prettier": "3.10.1",
+    "typescript": "6.0.3",
+    "vitest": "5.1.1"
+  },
+  "peerDependenciesMeta": {
+    "@playwright/test": {
+      "optional": true
+    },
+    "vitest": {
+      "optional": true
+    }
+  }
+}

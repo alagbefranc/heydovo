@@ -1,0 +1,19 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    "typecheck": {
+      "dependsOn": ["^typecheck"],
+      "inputs": ["src/**", "test/**", "*.ts", "*.json", "*.jsonc"],
+      "outputs": []
+    },
+    "lint": {
+      "inputs": ["src/**", "test/**", "*.ts", "*.mjs", "*.json"],
+      "outputs": []
+    },
+    "test": {
+      "dependsOn": ["^typecheck"],
+      "inputs": ["src/**", "test/**", "*.ts", "*.json", "*.jsonc"],
+      "outputs": ["coverage/**"]
+    }
+  }
+}

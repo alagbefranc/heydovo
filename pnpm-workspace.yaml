@@ -1,0 +1,22 @@
+packages:
+  - "apps/*"
+  - "services/*"
+  - "packages/*"
+  - "templates/*"
+
+# Fail the install when a package's peer dependencies do not match.
+strictPeerDependencies: true
+# Pin exact versions when adding a dependency (docs/SECURITY.md: pinned versions).
+saveExact: true
+
+# Supply-chain protection
+# Wait 7 days (in minutes) before a newly published version can be installed.
+minimumReleaseAge: 10080
+# Refuse an update whose publisher trust level is lower than the version it replaces.
+trustPolicy: no-downgrade
+# Transitive dependencies may only come from the registry, never from git or tarball URLs.
+blockExoticSubdeps: true
+# Only these packages may run install scripts (pnpm blocks all others).
+onlyBuiltDependencies:
+  - esbuild
+  - workerd

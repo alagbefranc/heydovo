@@ -29,11 +29,11 @@ Vendors run their business in the vendor portal. Staff run the platform from the
 2. State the task and the folder. Read the docs above.
 3. Write a short plan: files to create or change, tests to write, contracts touched. Stay inside the folder (plus `packages/contracts` only if a contract changes).
 4. For money, PIN, auth and order state: write the tests first.
-5. Implement. Run typecheck, lint and tests locally (`wrangler dev`, `vitest`).
+5. Implement. Run typecheck, lint and tests locally (`pnpm check` at the root, or `wrangler dev` and `vitest` in the folder).
 6. Update the folder's CLAUDE.md/README if behaviour changed. Summarise what changed and what's next.
 
 ## Ask before you
-- add a dependency (check CVEs, licence, maintenance, size);
+- add a dependency (check CVEs, licence, maintenance, size; pin the exact version, and it must be at least 7 days old: `pnpm-workspace.yaml` enforces this);
 - change a contract;
 - touch money, PIN or auth logic beyond the task;
 - do anything that conflicts with the docs.
@@ -52,6 +52,7 @@ Vendors run their business in the vendor portal. Staff run the platform from the
 - `apps/` website, secure-pages, vendor-portal, admin-portal
 - `services/` api-gateway + 14 business services
 - `packages/` contracts, sdk, ui, config
+- `templates/` worker (the Worker template every service starts from)
 - `infra/` Terraform, Wrangler configs, CI
 - `docs/` ARCHITECTURE, CONTRACTS, ALGORITHMS, CONVERSATION, SECURITY, TESTING, BUILD_PLAN
 
