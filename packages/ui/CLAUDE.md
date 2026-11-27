@@ -1,7 +1,7 @@
 # packages/ui
 
 ## Purpose
-The shared design system for all three web apps: Meta's Astryx (React 19 + StyleX) themed with Hey Dovo brand tokens from our Figma, plus shared composed components.
+The shared design system for all four web apps (website, secure-pages, vendor-portal, admin-portal): Meta's Astryx (React 19 + StyleX) themed with Hey Dovo brand tokens from our Figma, plus shared composed components.
 
 ## Steps
 1. Import Figma tokens (colours, typography, spacing, radius, shadows) [CONFIRM: Figma link pending] → Astryx theme (light + dark).

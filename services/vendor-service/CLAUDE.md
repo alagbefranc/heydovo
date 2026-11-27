@@ -18,7 +18,7 @@ Vendor businesses (stores and trades): applications, verification documents, loc
 - Slots: `holdSlot` (short hold during confirmation), `releaseSlot`, booked on `booking.confirmed`.
 - Stats (rating, accept, on-time) updated from review.created and order events.
 - `getStaffByPhone` for vendor text commands (verified numbers only).
-- RLS: portal requests set `app.vendor_id`; policies restrict rows to that vendor (defence in depth).
+- RLS (defence in depth; every query still filters by vendor id itself): each portal request runs its queries in one short transaction that starts with `select set_config('app.vendor_id', $1, true)`. Never rely on a session-level `SET`: Hyperdrive resets a connection when it returns to the pool, so the setting would be missing on the next query. Policies fail closed (no `app.vendor_id` → no rows). Tables use `FORCE ROW LEVEL SECURITY`, because a table's owner skips RLS otherwise. This service's Hyperdrive config has query caching off (docs/SECURITY.md, Platform).
 
 ## Events
 Publishes: vendor.applied, vendor.approved, vendor.paused, vendor.resumed, vendor.updated, vendor.document_expiring, vendor.document_expired.
@@ -28,4 +28,4 @@ Consumes: review.created, order.accepted/declined/completed (stats), booking.con
 - Expose customer data, other vendors' data, or document files without a short-lived signed URL.
 
 ## Tests
-PostGIS candidate queries (radius edges, polygons, timezones, closures, DST), document expiry job, slot hold races, RLS isolation, upload validation (type, size), approval flow.
+PostGIS candidate queries (radius edges, polygons, timezones, closures, DST), document expiry job, slot hold races, RLS isolation (two vendors' requests interleaved on pooled connections never see each other's rows; a query with no vendor id set returns nothing; the service role cannot bypass the policies), upload validation (type, size), approval flow.

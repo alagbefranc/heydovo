@@ -8,7 +8,7 @@ Users text or call one number. Dovo:
 - orders from local stores (focus: African and specialty grocers not on Uber Eats/DoorDash), for pickup or delivery;
 - books trades (plumbers, electricians, handypeople, cleaners) from vendors registered on OUR platform;
 - pays from a prepaid wallet (approved with a PIN on a secure web page) or a one-time payment link.
-Vendors run their business in the vendor portal. Staff run the platform from the admin portal.
+Vendors run their business in the vendor portal. Staff run the platform from the admin portal. The public website (landing page, `/start` link, legal pages) is `apps/website`.
 
 ## Golden rules (never break these)
 1. Work on ONE service or ONE app per session. Say which one at the start.
@@ -25,7 +25,7 @@ Vendors run their business in the vendor portal. Staff run the platform from the
 12. If something is unclear, missing (marked [CONFIRM]) or conflicts with these docs: STOP and ask. Do not guess.
 
 ## How to run a session
-1. Start Claude Code inside the folder you are building (for example `services/wallet-payments-service`), so its CLAUDE.md loads.
+1. Start Claude Code inside the folder you are building (for example `services/wallet-payments-service`), so its CLAUDE.md loads. In a cloud session, which always opens at the repo root, name the folder in your first message and read its CLAUDE.md before anything else.
 2. State the task and the folder. Read the docs above.
 3. Write a short plan: files to create or change, tests to write, contracts touched. Stay inside the folder (plus `packages/contracts` only if a contract changes).
 4. For money, PIN, auth and order state: write the tests first.
@@ -49,7 +49,7 @@ Vendors run their business in the vendor portal. Staff run the platform from the
 - Tests: Vitest, Playwright, axe, k6, OWASP ZAP, Semgrep/CodeQL, Trivy/Snyk, Checkov. CI: GitHub Actions + Wrangler. Infra: Terraform.
 
 ## Repo map
-- `apps/` secure-pages, vendor-portal, admin-portal
+- `apps/` website, secure-pages, vendor-portal, admin-portal
 - `services/` api-gateway + 14 business services
 - `packages/` contracts, sdk, ui, config
 - `infra/` Terraform, Wrangler configs, CI

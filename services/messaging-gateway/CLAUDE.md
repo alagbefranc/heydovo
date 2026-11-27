@@ -40,11 +40,12 @@ Reply on the channel the user last wrote from (`contact_channels.last_inbound_ch
 ## Entry links (onboarding, marketing)
 - RCS: Telnyx RCS deep links (`sms:` with the RCS agent address) pre-filled with a start message and source tag.
 - SMS: `sms:<number>?body=…`. WhatsApp: `https://wa.me/<number>?text=…`.
-- QR codes on posters and in vendor shops point to `heydovo.com/start?src=…`, which opens the best link for the device.
+- QR codes on posters and in vendor shops point to `heydovo.com/start?src=…`, which opens the best link for the device. `apps/website` owns that route.
 
 ## Inbound pipeline
-Verify Telnyx webhook signature (Ed25519 signature + timestamp headers; reject stale timestamps) [CONFIRM header names] → dedupe on provider_message_id → mask secrets (docs/ALGORITHMS.md §15) → store redacted text → handle STOP/START/HELP (and ARRÊT/AIDE) → rate limit per number (e.g. 30 msgs/min) → update contact_channels → publish `message.received`. Ack Telnyx quickly and process async.
+Verify Telnyx webhook signature (Ed25519 signature + timestamp headers; reject stale timestamps) [CONFIRM header names] → dedupe on provider_message_id → mask secrets (docs/ALGORITHMS.md §15: cards by Luhn check; PIN/OTP candidates checked with `auth.checkSecretExposure`, 1 s timeout) → store redacted text and the list of redaction kinds → handle STOP/START/HELP (and ARRÊT/AIDE/REPRENDRE) → rate limit per number (e.g. 30 msgs/min) → update contact_channels → publish `message.received`. Ack Telnyx quickly and process async.
 Media (photos): download to R2 (private), pass keys, never raw URLs.
+Keywords [CONFIRM]: that Telnyx supports custom opt-in/opt-out words (REPRENDRE, ARRÊT), and whether Telnyx or the carriers treat CANCEL, END or QUIT as opt-out words by default. CANCEL is our "cancel my order" shortcut and must reach the agent.
 
 ## Outbound
 Consume `message.send` → idempotent on idempotency_key → apply routing rule → send via Telnyx → record → publish `message.delivered` / `message.failed`. Respect opt-outs for non-essential messages. Replies to a user's own message are always allowed.
@@ -54,7 +55,7 @@ Publishes: message.received, message.delivered, message.failed, messaging.opted_
 Consumes: message.send.
 
 ## Must never
-- Call OpenAI or contain conversation logic. Store unredacted PINs/cards. Expose Telnyx keys. Send WhatsApp free-form messages outside the 24 h window.
+- Call OpenAI or contain conversation logic. Store, log or queue unredacted PINs, OTPs or cards (candidate digits go only to `auth.checkSecretExposure`, in memory). Expose Telnyx keys. Send WhatsApp free-form messages outside the 24 h window.
 
 ## Tests
-Webhook signature (valid, forged, replayed/stale), dedupe, masking cases (PIN-only, "my pin is", Luhn card, "2 bags" and refs like D4821 untouched), RCS send with SMS fallback (rich + plain text both complete), WhatsApp window and template rules, button/list/location parsing, BSUID inbound and reply, template fallback to RCS/SMS on 40008, channel routing, opt-outs, idempotent sends, media to R2, voice tool webhook → agent session.
+Webhook signature (valid, forged, replayed/stale), dedupe, masking cases (digits that match the sender's PIN → redacted + reset; a typed OTP → redacted + cancelled; a bare house number and "buzzer code 4821" that match nothing → untouched; "my pin is 4821" that matches nothing → redacted, no reset; check unavailable or over the limit; Luhn card; "2 bags" and refs like D4821 untouched), RCS send with SMS fallback (rich + plain text both complete), WhatsApp window and template rules, button/list/location parsing, BSUID inbound and reply, template fallback to RCS/SMS on 40008, channel routing, opt-outs, idempotent sends, media to R2, voice tool webhook → agent session.

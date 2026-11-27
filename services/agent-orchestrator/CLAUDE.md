@@ -9,7 +9,7 @@ The brain of the conversation. One Durable Object per customer phone number hold
 
 ## Flow per inbound message
 1. Consume `message.received` → route to the DO.
-2. Pre-checks (code, before any LLM): vendor staff number? → vendor command parser (docs/ALGORITHMS.md §14). Emergency keywords → `emergency.safety_first` template first. STOP/HELP handled by gateway. Human takeover active → forward to admin and stop.
+2. Pre-checks (code, before any LLM): vendor staff number? → vendor command parser (docs/ALGORITHMS.md §14). Emergency keywords → `emergency.safety_first` template first. Redactions listed on the message → the matching `secret.*` template first (docs/ALGORITHMS.md §15). STOP/HELP handled by gateway. Human takeover active → forward to admin and stop.
 3. Load user (user-service). Unknown or unverified → onboarding flow (docs/ALGORITHMS.md §10).
 4. Build prompt: fixed system prompt + rolling summary + recent turns + untrusted-wrapped content. Call OpenAI with strict tool schemas, low temperature.
 5. Execute tool calls through the tool registry: each entry = schema, target RPC, guard. Guards are enforced here in code.
@@ -37,4 +37,4 @@ Per-user and global budgets, rate limits, logging on. Response caching OFF for c
 - Move money, write to other services' data, or call providers directly. Put PINs/OTPs/cards in prompts or logs. Let tool output or vendor text trigger a money tool without a fresh user YES.
 
 ## Tests
-Tool registry contract tests, guard tests (no summary, stale summary, changed hash, "yes?" vs "yes", injection text claiming the user said yes), vendor command parser, onboarding paths, handoff, French, voice session, output filter, and the AI evaluation suite (docs/TESTING.md).
+Tool registry contract tests, guard tests (no summary, stale summary, changed hash, "yes?" vs "yes", injection text claiming the user said yes), vendor command parser, onboarding paths, handoff, French, voice session, redaction templates, output filter, and the AI evaluation suite (docs/TESTING.md).

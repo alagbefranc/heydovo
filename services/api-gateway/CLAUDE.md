@@ -1,7 +1,7 @@
 # api-gateway
 
 ## Purpose
-Single entry point for the three web apps (`/api/*`). Thin: authenticate, authorise by role, rate-limit, validate, route to the owning service over service bindings. No business logic, no database.
+Single entry point (`/api/*`) for the three web apps that call the API: secure-pages, vendor-portal and admin-portal. `apps/website` is static and does not call it. Thin: authenticate, authorise by role, rate-limit, validate, route to the owning service over service bindings. No business logic, no database.
 
 ## Responsibilities
 - Verify sessions: vendor and staff JWTs (Supabase Auth) via auth-security-service; secure-page requests via link token.

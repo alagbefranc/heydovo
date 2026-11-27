@@ -28,11 +28,11 @@ Change the schema first, version it, and keep old versions working until every c
 ## Events
 | Event | Producer | Main consumers | Key data |
 |-------|----------|----------------|----------|
-| message.received | messaging-gateway | agent-orchestrator, analytics | fromE164 or fromBsuid, channel, type, textRedacted, buttonId?, listRowId?, location?, mediaRefs, providerMessageId |
+| message.received | messaging-gateway | agent-orchestrator, analytics | fromE164 or fromBsuid, channel, type, textRedacted, redactions? (kinds only, never the digits), buttonId?, listRowId?, location?, mediaRefs, providerMessageId |
 | message.send | agent, notification | messaging-gateway | toE164 or toBsuid, channel?, text (full plain-text version), buttons?, linkButton?, list?, locationRequest?, templateKey?, templateVars?, mediaRefs?, priority |
 | message.delivered / message.failed | messaging-gateway | agent, notification | messageId, error? |
 | messaging.opted_out / messaging.opted_in | messaging-gateway | user-service, notification | phoneE164, keyword |
-| security.secret_exposed | messaging-gateway | auth-security, agent | phoneE164, kind (pin, card) |
+| security.secret_exposed | messaging-gateway | auth-security, agent | phoneE164 or bsuid, kind (pin, otp, card) |
 | handoff.requested / handoff.ended | agent-orchestrator | admin-service, notification | userId, reason, conversationId |
 | user.registered / user.updated / user.verified / user.closed | user-service | agent, analytics, notification | userId, changedFields |
 | consent.changed | user-service | notification, analytics | userId, kind, granted, version |
@@ -67,12 +67,12 @@ Change the schema first, version it, and keep old versions working until every c
 
 ## Sync APIs (RPC methods)
 - **user-service**: `getByPhone`, `getByBsuid`, `getById`, `createPending`, `updateProfile`, `addAddress` (geocodes, checks served area), `listAddresses`, `setDefaultAddress`, `recordConsent`, `getOnboarding`, `setOnboardingStep`, `exportData`, `closeAccount`.
-- **auth-security-service**: `createSecureLink({purpose, userId, refType?, refId?, amountCents?, summaryHash?})`, `resolveLink(token)`, `startOtp(phone, purpose)`, `verifyOtp`, `setPin(token, pin, pinConfirm)`, `verifyPin(token, pin)`, `startPinReset`, `verifyStaffSession(jwt)`, `verifyVendorSession(jwt)`, `requireReverification(userId, reason)`.
+- **auth-security-service**: `createSecureLink({purpose, userId, refType?, refId?, amountCents?, summaryHash?})`, `resolveLink(token)`, `startOtp(phone, purpose)`, `verifyOtp`, `setPin(token, pin, pinConfirm)`, `verifyPin(token, pin)`, `startPinReset`, `verifyStaffSession(jwt)`, `verifyVendorSession(jwt)`, `requireReverification(userId, reason)`, `checkSecretExposure({fromE164?, fromBsuid?, digits})` (messaging-gateway only; returns `pin`, `otp` or `none`; docs/ALGORITHMS.md §15).
 - **vendor-service**: `apply`, `getVendor`, `updateProfile`, `getUploadUrl`, `reviewDocument`, `setStatus`, `listCandidates({point, kind, category?, fulfilment?, at})`, `getAvailability(vendorId, range)`, `holdSlot`, `releaseSlot`, `getStaffByPhone(phoneE164)`, `getPayoutAccount`.
 - **catalogue-quotes-service**: `searchProducts({query, userPoint, fulfilment, limit})`, `searchServices({need, category?, userPoint, at, emergency})`, `getProducts(ids)` (current price/stock), `upsertProduct`, `bulkUpload`, `upsertService`, `createQuoteRequest`, `submitQuote`, `acceptQuote`, `getRankingWeights(category)`.
 - **order-booking-service**: `createDraft({userId, vendorId, items, fulfilment, addressId?, deliveryQuoteId?})`, `updateDraft`, `requestConfirmation(draftId, summaryHash)`, `createBookingDraft`, `requestBookingConfirmation`, `getStatus(refId)`, `cancel(refId, by, reason)`, `switchFulfilment`; vendor actions `accept`, `decline`, `proposeSubstitution`, `markReady`, `verifyPickupCode`, `updateBookingStatus`, `submitFinalQuote`.
-- **wallet-payments-service**: `getBalance(userId)`, `createTopUpLink(userId, amountCents)`, `hold({userId, refType, refId, amountCents, idempotencyKey})`, `capture(holdId, splits)`, `release(holdId)`, `createPaymentLink({userId, refType, refId, amountCents})`, `refund({refType, refId, amountCents, reason, idempotencyKey})`, `getLedger(filter)` (admin), `runPayouts(period)` (Workflow), `createConnectOnboardingLink(vendorId)`.
-- **delivery-service**: `quote({pickup, dropoff, orderValueCents, readyAt})` (best quote + alternatives), `book({orderId, quoteId})`, `cancel(deliveryId)`, `get(deliveryId)`.
+- **wallet-payments-service**: `getBalance(userId)`, `createTopUpLink(userId, amountCents)`, `hold({userId, refType, refId, amountCents, idempotencyKey})`, `capture(holdId, splits)`, `release(holdId)`, `createPaymentLink({userId, refType, refId, amountCents})`, `refund({refType, refId, amountCents, reason, idempotencyKey})`, `getLedger(filter)` (admin), `runPayouts(period)` (Workflow), `createConnectOnboardingLink(vendorId)`. Each method accepts only the callers in the allowed-caller table in `services/wallet-payments-service/CLAUDE.md`.
+- **delivery-service**: `quote({pickup, dropoff, orderValueCents, readyAt})` (best quote + alternatives), `book({orderId, quoteId})` (returns the booked `feeCents`), `cancel(deliveryId)`, `get(deliveryId)`.
 - **reviews-disputes-service**: `createReview`, `replyToReview`, `hideReview`, `openDispute`, `addDisputeMessage`, `resolveDispute`.
 - **admin-service**: settings, flags, launch regions, audit log, refund approvals, takeover messages (see its CLAUDE.md).
 
@@ -102,4 +102,4 @@ Every tool has a strict JSON schema in `packages/contracts/src/agent-tools`. The
 | update_address / set_language | user.* | verified user |
 | handoff_to_human | emits handoff.requested | always allowed |
 
-No tool moves money directly. `confirm_order` only starts the PIN or payment-link step.
+No tool moves money directly. `confirm_order` only starts the PIN or payment-link step. `get_balance` and `create_topup_link` are the only wallet methods the agent can reach.

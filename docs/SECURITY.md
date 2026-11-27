@@ -16,11 +16,12 @@ Security first. Follow OWASP Top 10, OWASP API Security Top 10 and OWASP Top 10 
 - Spending limits, velocity checks and fraud scoring before holds and top-ups.
 - Wallet funds held in a segregated account; legal review for FINTRAC money-services rules and provincial prepaid rules before launch [CONFIRM].
 - Refunds above a threshold need two staff approvals.
+- wallet-payments-service accepts each method only from the callers in its allowed-caller table. Money-moving methods (hold, capture, release, refund, payouts) are never reachable from the agent, the MCP connector or a web app.
 
 ## PIN, OTP, links
 - See docs/ALGORITHMS.md sections 7–9. Peppered argon2id, constant-time compare, 5-attempt lockout, PIN only on secure pages.
 - Secure links: random 256-bit tokens, hashed at rest, single use, short TTL, bound to purpose/amount/summary, no PII in URLs.
-- Inbound messages masked for PINs and card numbers before storage or AI.
+- Inbound messages masked for PINs, OTPs and card numbers before storage or AI. PIN/OTP candidates are checked against the sender's own PIN and live OTP, so an ordinary number (house number, buzzer code) is not treated as a leak and does not force a PIN reset (docs/ALGORITHMS.md §15).
 
 ## Accounts and identity
 - Customers: phone OTP at registration; re-verify after 90 days inactive, after a secret exposure, before unusually large orders, or on suspicious signals (number recycling / SIM swap risk). Consider carrier lookup on the number before large payments [CONFIRM Telnyx Number Lookup].
@@ -33,6 +34,8 @@ Security first. Follow OWASP Top 10, OWASP API Security Top 10 and OWASP Top 10 
 - Webhooks verified by signature/secret and timestamp (replay protection), deduped by provider event id: Telnyx messaging, RCS, WhatsApp and voice (Ed25519 signature + timestamp) [CONFIRM headers], Stripe (Stripe-Signature), DoorDash [CONFIRM], Uber Direct [CONFIRM].
 - Cloudflare WAF managed rules, bot protection, rate limiting on all public routes; Turnstile on secure pages and portal logins; API Shield schema validation on the api-gateway.
 - Least privilege: each Worker gets only the bindings it needs; each DB role only its schema; RLS on vendor-facing tables.
+- RLS through Hyperdrive: set the tenant id (for example `app.vendor_id`) with `set_config(name, value, true)` inside the same short transaction as the queries that need it. Hyperdrive resets a connection when it returns to the pool, so a session-level `SET` does not reach the next query. Policies fail closed when the setting is missing, tables use `FORCE ROW LEVEL SECURITY` (a table's owner skips RLS otherwise), and every query still filters by tenant id itself.
+- Hyperdrive query caching is off for every service config. The cache matches on the query, not on who is asking, and can return results up to a minute old. That is unsafe for balances, PIN and lockout state, order state, idempotency checks and any tenant-scoped read. Turn it on only for a named public read path (for example catalogue search) through its own cache-enabled config.
 - Strict security headers on web apps: CSP (no inline scripts; allow only self, Stripe, Turnstile), X-Frame-Options DENY (except Stripe frames), Referrer-Policy no-referrer on secure pages, Permissions-Policy minimal.
 - R2 objects private; access via short-lived signed URLs; uploads scanned for type and size, images re-encoded.
 - Input validation with zod at every boundary; parameterised SQL only.

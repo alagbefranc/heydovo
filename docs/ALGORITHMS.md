@@ -44,15 +44,18 @@ Top 2–3 with distance, price, ETA, rating, nearest first. User may reply MORE,
 All integer cents. Round half up at each line, never on totals only.
 ```
 itemsSubtotal   = Σ (unitPriceCents × qty)            // live prices re-checked at draft and at confirmation
-tax             = per province and tax category        // [CONFIRM with accountant: GST/HST/PST/QST and marketplace-facilitator rules]
+itemsTax        = per province and item tax category   // [CONFIRM with accountant: GST/HST/PST/QST and marketplace-facilitator rules]
 deliveryFee     = delivery quote at cost (0 for pickup and trades)
 serviceFee      = config.serviceFeeCents (250)
+feesTax         = tax on serviceFee and deliveryFee, per province   // [CONFIRM with accountant: whether each fee is taxable and at what rate]
+tax             = itemsTax + feesTax
 total           = itemsSubtotal + tax + deliveryFee + serviceFee
 commission      = round(itemsSubtotal × commissionBps / 10000)   // 500 goods, 800 trades; vendor override allowed
 vendorPayable   = itemsSubtotal + vendorCollectedTax − commission − vendorLiableRefunds
 platformRevenue = serviceFee + commission              // Stripe fees are a platform expense
 ```
-- If a courier re-quote at booking time is higher than the fee shown, the platform absorbs the difference. The user is never charged more than the summary.
+- Tax rates are never hard-coded: `itemsTax` and `feesTax` come from config per province and tax category. `vendorCollectedTax` is `itemsTax` when the vendor remits it; if the platform must remit item tax (marketplace-facilitator rules [CONFIRM]), it is 0 and `itemsTax` goes to `tax_payable`. `feesTax` always goes to `tax_payable`. Whether GST/HST applies to the commission charged to vendors is also [CONFIRM].
+- If a courier re-quote at booking time is higher than the fee shown, the platform absorbs the difference and books it to `delivery_subsidy_expense` (§6). The user is never charged more than the summary. If the booked fee is lower than the fee shown: [CONFIRM: return the difference to the user, or keep the fee shown and book the surplus against `delivery_subsidy_expense`].
 - Trades: call-out fee is held at booking; the final price needs a new summary + YES (+ PIN if more funds are needed). Commission applies to the final job total before tax.
 
 ## 4. Summary hash and confirmation (order-booking-service + agent-orchestrator)
@@ -81,12 +84,13 @@ Side exits: BOOKED → CANCELLED (free if ≥ 24 h before, or before vendor sets
 ## 6. Wallet ledger (wallet-payments-service)
 Double-entry. Every transaction's entries sum to zero (enforced by a deferred constraint trigger). Balances are derived from entries, never stored as mutable numbers (a cached balance may be kept but is rebuilt from entries in reconciliation).
 
-**Accounts**: `user_wallet:{userId}`, `user_hold:{holdId}`, `stripe_clearing`, `platform_fee_revenue`, `platform_commission_revenue`, `vendor_payable:{vendorId}`, `delivery_payable:{provider}`, `tax_payable` [CONFIRM if platform remits], `refund_expense`, `chargeback_loss`, `stripe_fee_expense`.
+**Accounts**: `user_wallet:{userId}`, `user_hold:{holdId}`, `stripe_clearing`, `platform_fee_revenue`, `platform_commission_revenue`, `vendor_payable:{vendorId}`, `delivery_payable:{provider}`, `tax_payable` (tax on platform fees; item tax too if the platform remits [CONFIRM]), `delivery_subsidy_expense`, `refund_expense`, `chargeback_loss`, `stripe_fee_expense`.
 
 **Transactions** (sign: + debit, − credit, shown as from → to):
 - Top-up succeeded: stripe_clearing → user_wallet.
 - Hold (order confirmed): user_wallet → user_hold.
-- Capture (order completed): user_hold → vendor_payable (itemsSubtotal + vendor tax − commission), platform_commission_revenue (commission), platform_fee_revenue (service fee), delivery_payable (delivery fee).
+- Capture (order completed): user_hold → vendor_payable (itemsSubtotal + vendorCollectedTax − commission), platform_commission_revenue (commission), platform_fee_revenue (service fee), delivery_payable (delivery fee shown), tax_payable (feesTax, plus itemsTax if the platform remits).
+- Delivery subsidy (posted with the capture, when the booked courier fee is higher than the fee shown): delivery_subsidy_expense → delivery_payable for the difference, so `delivery_payable:{provider}` always equals what the provider will bill.
 - Release (cancelled before capture): user_hold → user_wallet (amount per refund rules; the rest captured as above).
 - Pay-by-link order: stripe_clearing → user_hold, then capture as normal.
 - Refund after capture: reverse the captured lines in proportion, or charge vendor_payable if vendor liable; destination = user_wallet (wallet payments) or card via Stripe refund (link payments).
@@ -98,6 +102,8 @@ Double-entry. Every transaction's entries sum to zero (enforced by a deferred co
 **Closing a wallet**: refund the balance to the original top-up charges, newest first, within the processor's refund window [CONFIRM Stripe window]; remainder by other method after identity check.
 
 **Daily reconciliation**: compare Stripe balance transactions with ledger; alert on any mismatch.
+
+**Courier reconciliation**: compare `delivery_payable:{provider}` with each provider's statement or invoice for the period [CONFIRM billing cycle]; alert on any mismatch.
 
 ## 7. PIN (auth-security-service)
 - 4–6 digits. Reject weak PINs: all same digit, sequences (1234, 4321, 123456), the last 4 digits of the user's phone, and a top-100 common list.
@@ -143,12 +149,33 @@ Weekly [CONFIRM day]. For each vendor: payable = vendor_payable balance for orde
 ## 14. Vendor text commands (agent-orchestrator, deterministic, no AI)
 From a verified vendor staff phone only: `YES <ref>` accept · `NO <ref> <reason>` decline · `READY <ref>` · `PICKED <pickup code>` · `PAUSE` / `RESUME` · `HELP`. If a vendor has exactly one pending order, `YES`/`NO`/`READY` without a number applies to it; otherwise ask which.
 
-## 15. Secret masking (messaging-gateway)
-Before storing or forwarding any inbound text:
-- A message that is only 4–8 digits, or digits following words like "pin", "code", "password", "nip", "mot de passe" → replace digits with `[REDACTED]`, emit `security.secret_exposed(kind: pin)`.
-- 13–19 digit sequences passing the Luhn check → `[REDACTED_CARD]`, emit `security.secret_exposed(kind: card)`.
-- The agent then warns the user and auth-security requires a PIN reset (for pin).
-- So normal use never needs an all-digit message: customer-facing order refs carry a letter prefix (for example `D4821` delivery, `P4821` pickup, `B4821` booking) and pickup codes are 6-character letter+digit mixes without lookalikes (no 0/O, 1/I), for example `K7P2QX`.
+## 15. Secret masking (messaging-gateway, with a check by auth-security)
+Runs before any inbound text is stored, logged or forwarded. Two goals: a real PIN, OTP or card number never reaches storage, logs or the AI; and an ordinary number (house number, buzzer code, quantity) never forces a PIN reset.
+
+**Cards**: 13–19 digit sequences passing the Luhn check → `[REDACTED_CARD]`, emit `security.secret_exposed(kind: card)`.
+
+**PIN and OTP candidates**
+- (a) a message that is only 4–6 digits;
+- (b) 4–8 digits straight after a secret word: "pin", "nip", "password", "passcode", "mot de passe";
+- (c) 4–6 digits straight after the bare word "code" (often a buzzer or door code).
+
+For each candidate (at most 3 per message) the gateway calls `auth.checkSecretExposure({ fromE164 | fromBsuid, digits })`. auth-security compares the digits with the sender's own PIN hash and with any unexpired OTP for that sender, and answers `pin`, `otp` or `none`.
+- The digits exist only in memory for that call. They are never logged, stored or put on a Queue.
+- The call is not a PIN attempt. It never counts toward the lockout and never approves or unlocks anything; it can only make things stricter.
+- A sender with no PIN and no live OTP (new or unverified user) gets `none`.
+- Limit: 10 checks per sender per hour (config). Over the limit, on an error, or after a 1 s timeout the answer is `unavailable`.
+
+| Answer | Stored and forwarded text | What happens next |
+|--------|---------------------------|-------------------|
+| `pin` | digits → `[REDACTED]` | auth-security marks the PIN as needing a reset; emit `security.secret_exposed(kind: pin)`; agent sends `secret.exposed_warning` |
+| `otp` | digits → `[REDACTED]` | auth-security cancels that code; emit `security.secret_exposed(kind: otp)`; agent says codes go only on the secure page and offers a new one |
+| `none`, candidate (a) or (c) | unchanged | nothing: it is an ordinary number |
+| `none`, candidate (b) | digits → `[REDACTED]` | no reset; agent sends `secret.reminder` (never send PINs or passwords in chat) |
+| `unavailable`, candidate (a) or (c) | digits → `[REDACTED]` | no reset; agent sends `secret.number_hidden` and asks the user to send the number again with a word, for example "unit 1250" |
+| `unavailable`, candidate (b) | digits → `[REDACTED]` | fail safe: treated as `pin` (event + PIN reset) |
+
+- The gateway lists what it hid in `message.received.redactions` (kinds only: `pin`, `otp`, `card`, `other_secret`, `unchecked_number`) so the agent can pick the template without ever seeing the digits.
+- Normal use rarely needs an all-digit message anyway: customer-facing order refs carry a letter prefix (for example `D4821` delivery, `P4821` pickup, `B4821` booking) and pickup codes are 6-character letter+digit mixes without lookalikes (no 0/O, 1/I), for example `K7P2QX`.
 
 ## 16. Identifiers shown to people
 - Order refs: prefix + 4–6 digits, unique per active period, mapped to the UUID internally.

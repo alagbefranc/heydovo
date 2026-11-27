@@ -26,6 +26,9 @@ Web apps → api-gateway Worker (behind Cloudflare WAF) → services
   vendor-portal (vendors; Supabase Auth + 2FA)
   admin-portal  (staff; Cloudflare Zero Trust Access + Supabase Auth + 2FA) → admin-service
 
+Public website (static, no API calls)
+  website       (heydovo.com: landing page, /start entry link, legal pages, security.txt)
+
 Every service → Supabase Postgres (Canada), its own schema + role, via Hyperdrive
 ```
 
@@ -61,7 +64,7 @@ Each service = one Worker + one Postgres schema + one DB role + its own tests, m
 
 ## Key flows
 ### Inbound message
-1. Telnyx webhook → messaging-gateway verifies the signature, stores it, masks secrets, acks fast and processes async.
+1. Telnyx webhook → messaging-gateway verifies the signature, masks secrets (PIN/OTP candidates are checked with auth-security, docs/ALGORITHMS.md §15), stores only the redacted message, acks fast and processes the rest async.
 2. Publishes `message.received` → agent-orchestrator routes to the Durable Object for that phone number.
 3. If the sender is a registered vendor staff number → deterministic vendor command parser (no AI).
 4. Otherwise the agent loads context and calls OpenAI with tools; replies go out as `message.send`.
@@ -73,7 +76,7 @@ Each service = one Worker + one Postgres schema + one DB role + its own tests, m
 4. User enters PIN on secure-pages → `pin.verified` → order-booking calls `wallet.hold` → order CONFIRMED → `order.confirmed`.
 5. Vendor accepts (portal or YES by text) → `order.accepted` → prepares → `order.ready`.
 6. order-booking calls `delivery.book` → `delivery.assigned` → `delivery.picked_up` → `delivery.delivered`.
-7. `order.completed` → order-booking calls `wallet.capture` → ledger splits fee, commission, delivery cost, vendor payable.
+7. `order.completed` → order-booking calls `wallet.capture` → ledger splits fee, commission, delivery cost, tax, vendor payable.
 8. Agent texts updates at each step (templated, EN/FR).
 
 ### Pay-by-link and split payment
@@ -95,7 +98,7 @@ Calls to the Hey Dovo number go to Telnyx Voice AI, which handles speech; its to
 mcp-connector-service exposes MCP tools that call the same service APIs, with the same confirmation and PIN rules. Accounts link through OAuth with phone OTP.
 
 ## Storage
-- Supabase Postgres (Canada): schema per service, role per service, RLS as defence in depth. PostGIS, pgvector, full-text search (English + French).
+- Supabase Postgres (Canada): schema per service, role per service, RLS as defence in depth. PostGIS, pgvector, full-text search (English + French). Through Hyperdrive, query caching is off unless a read path is named as cacheable, and RLS settings are transaction-local (docs/SECURITY.md, Platform).
 - R2: product images, repair photos, vendor documents (private; short-lived signed URLs). Cloudflare Images for resizing.
 - KV: config and feature-flag cache. Durable Objects: live conversation state.
 - Analytics Engine + Logpush: metrics and logs. Sentry: errors.

@@ -12,12 +12,13 @@ The short web pages customers open from chat links. Mobile-first, fast, branded,
 - **Pay link**: summary → Stripe Checkout (card, Apple Pay, Google Pay).
 - **Track**: read-only order status timeline, courier ETA, pickup code for pickup orders.
 - **Privacy request**: access/correct/delete/portability form.
-- Static: `/terms`, `/privacy`, `/refunds`, `/vendor-terms` (EN/FR).
+- Legal pages (`/terms`, `/privacy`, `/refunds`, `/vendor-terms`, EN/FR) live in `apps/website` on the same host. Link to them; do not copy them here.
 
 ## Components
 BrandHeader, OrderSummaryCard, AmountDisplay, PinPad, OtpInput, ConsentCheckbox, ProgressSteps, AddressConfirm, StatusTimeline, PickupCodeCard, SuccessReturnToChat, ErrorState, ExpiredLinkState, LockedState, LanguageToggle.
 
 ## Rules
+- This app owns only `heydovo.com/l/*`; everything else on the host belongs to `apps/website`. Keep its pages and assets under `/l/` (for example Next.js `basePath: '/l'`) so the two apps never collide.
 - Token only in the path; never put PII in URLs or analytics. Referrer-Policy no-referrer.
 - PinPad: `type="password"` + `inputmode="numeric"`, no autofill/autocomplete, no keystroke logging, masked, 44px+ touch targets, screen-reader labels.
 - Turnstile on every POST. Strict CSP (self, Stripe, Turnstile only). No third-party analytics scripts.

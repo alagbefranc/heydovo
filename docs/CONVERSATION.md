@@ -12,17 +12,17 @@ There is no app UI. The conversation is the product. Implemented mainly in agent
 1. One clarifying question at a time, only when needed.
 2. Before any charge, send a clear summary: vendor, items or service, prices, fees (delivery, $2.50 service fee), taxes, total, ETA or time slot, pickup or delivery, payment source. **(code: summary template + summaryHash)**
 3. Charge only after an explicit YES **(code: deterministic matcher)**, then the PIN link (wallet) or payment link. Anything else is not consent.
-4. Shortcuts: YES, NO, CHANGE, CANCEL, MORE, HELP, AGENT (human), BALANCE, STOP (opt out), START. French equivalents: OUI, NON, MODIFIER, ANNULER, AIDE, AGENT, SOLDE, ARRÊT.
+4. Shortcuts: YES, NO, CHANGE, CANCEL, PICKUP (switch a delivery draft to pickup; sends a new summary), MORE, HELP, AGENT (human), BALANCE, STOP (opt out), START. French equivalents: OUI, NON, MODIFIER, ANNULER, RAMASSAGE, PLUS, AIDE, AGENT, SOLDE, ARRÊT, REPRENDRE [CONFIRM the French words RAMASSAGE, PLUS and REPRENDRE with a native speaker].
 5. Proactive updates at each step **(code: templated, not LLM)**: confirmed, accepted, ready, picked up, arriving, delivered; trades: on the way, started, final quote, done.
 6. When unsure, after two failed clarifications, or if the user is upset → offer a human (AGENT).
 7. Photos welcome for repairs and order problems.
 8. Emergencies (gas smell, fire, sparking/flooding near electrics, carbon monoxide alarm): first tell the user to leave if unsafe and call 911 or the utility; then offer help. Never delay safety advice. **(code: keyword pre-check before LLM)**
-9. Never ask for or repeat a PIN, OTP, or card number in chat. If a user sends one, it's masked upstream; reply with the warning template and start a PIN reset.
+9. Never ask for or repeat a PIN, OTP, or card number in chat. If a user sends one, it's masked upstream (docs/ALGORITHMS.md §15); reply with the matching `secret.*` template. A PIN reset starts only when the digits matched the user's real PIN, so a house number or buzzer code sent on its own is treated as an ordinary number.
 10. Never share vendor or customer phone numbers. All contact goes through Dovo.
 11. Restricted items (alcohol, cannabis, tobacco, weapons, prescription drugs) are refused politely unless admin enables a category with age checks.
 
 ## Message templates (keys live in packages/contracts/src/templates, EN + FR)
-- `summary.product`, `summary.booking`, `confirm.pin_link`, `confirm.pay_link`, `order.confirmed`, `order.accepted`, `order.ready_pickup`, `delivery.picked_up`, `delivery.arriving`, `order.delivered`, `booking.on_the_way`, `booking.final_quote`, `order.cancelled`, `refund.issued`, `wallet.low_balance`, `pin.locked`, `secret.exposed_warning`, `emergency.safety_first`, `handoff.started`, `error.generic`.
+- `summary.product`, `summary.booking`, `confirm.pin_link`, `confirm.pay_link`, `order.confirmed`, `order.accepted`, `order.ready_pickup`, `delivery.picked_up`, `delivery.arriving`, `order.delivered`, `booking.on_the_way`, `booking.final_quote`, `order.cancelled`, `refund.issued`, `wallet.low_balance`, `pin.locked`, `secret.exposed_warning`, `secret.reminder`, `secret.number_hidden`, `emergency.safety_first`, `handoff.started`, `error.generic`.
 
 ## Channel rendering
 - WhatsApp: summaries with YES / CHANGE / CANCEL quick-reply buttons; PIN and payment links as "Approve with PIN" / "Pay now" link buttons; vendor choices as a list; onboarding address via a location request (then confirm the street address).
@@ -31,9 +31,11 @@ There is no app UI. The conversation is the product. Implemented mainly in agent
 - Outside WhatsApp's 24-hour window, updates use the approved UTILITY templates listed in services/messaging-gateway/CLAUDE.md.
 
 ## Samples
+Tax amounts in these samples are illustrative only. The real rules are [CONFIRM] (docs/ALGORITHMS.md §3).
+
 **Product order (delivery)**
 > User: can I get 2 bags of garri and palm oil from an African store
-> Dovo: Sure, Francis. Mama's Market (2.1 km) has Garri 2 kg at $8.99 each and Palm Oil 1 L at $7.49. Delivery $6.50, about 45 min. Service fee $2.50. Total $34.47 (incl. tax). Pay from wallet (balance $60.00). Reply YES to order, CHANGE to edit, or PICKUP to collect it yourself.
+> Dovo: Sure, Francis. Mama's Market (2.1 km) has Garri 2 kg at $8.99 each and Palm Oil 1 L at $7.49. Delivery $6.50, about 45 min. Service fee $2.50. Tax $1.17. Total $35.64. Pay from wallet (balance $60.00). Reply YES to order, CHANGE to edit, or PICKUP to collect it yourself.
 > User: yes
 > Dovo: Great! Tap to approve with your PIN: heydovo.com/l/… (expires in 10 min)
 > Dovo (after PIN): Done! Order D4821 is confirmed. I'll text you when the driver picks it up.

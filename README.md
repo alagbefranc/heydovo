@@ -6,7 +6,7 @@ instructions Claude Code needs to build each part correctly and keep the service
 ## How to use
 1. Create an empty Git repo and copy everything in this folder into its root.
 2. Open `docs/BUILD_PLAN.md`. Build in that order.
-3. For each step, open Claude Code inside the folder named in the step and paste the step's prompt.
+3. For each step, open Claude Code inside the folder named in the step and paste the step's prompt. In a cloud session, which opens at the repo root, name the folder in your first message instead.
 4. Search for `[CONFIRM]` and fill in or verify those items before the related step.
 
 ## What's inside

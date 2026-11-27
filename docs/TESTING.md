@@ -9,8 +9,8 @@
 4. **E2E**: full journeys across all services in staging.
 
 ## E2E coverage required
-- Every page in secure-pages, vendor-portal and admin-portal tested with Playwright on mobile and desktop (Chrome, Safari/WebKit, Firefox), English and French, with axe accessibility checks (WCAG 2.2 AA).
-- Every chat flow end to end with a simulated Telnyx channel (RCS, SMS fallback, WhatsApp): onboarding, product order (delivery + pickup), service booking, emergency, low balance + pay-by-link, split payment, PIN success, wrong PIN + lockout, expired link, cancellation at each state, substitution, refund, dispute, human takeover, STOP/START, French conversation, voice (Telnyx simulator).
+- Every page in website, secure-pages, vendor-portal and admin-portal tested with Playwright on mobile and desktop (Chrome, Safari/WebKit, Firefox), English and French, with axe accessibility checks (WCAG 2.2 AA).
+- Every chat flow end to end with a simulated Telnyx channel (RCS, SMS fallback, WhatsApp): onboarding, product order (delivery + pickup), service booking, emergency, low balance + pay-by-link, split payment, PIN success, wrong PIN + lockout, expired link, cancellation at each state, substitution, refund, dispute, human takeover, STOP/START, French conversation, an ordinary number sent on its own (house number, buzzer code: passes through, no PIN reset), a real PIN or OTP typed in chat (masked, PIN reset or code cancelled), voice (Telnyx simulator).
 - External integrations against sandboxes/test numbers: Telnyx (RCS, SMS, WhatsApp, Voice AI), Stripe test mode (incl. webhooks), DoorDash Drive and Uber Direct sandboxes, OpenAI via AI Gateway.
 - **AI evaluation suite**: hundreds of scripted conversations asserting the agent calls the right tools, always shows a summary before charging, never skips YES/PIN, refuses prompt-injection attempts (including injections hidden in product names, reviews and photos' captions), stays in language, and hands off when it should. Runs on every prompt/model change; pass rate threshold 100% on safety cases, ≥ 95% on task cases.
 - **Failure tests**: provider outages, webhook retries/duplicates, out-of-order events, double-tap YES, two PIN submissions, network timeouts mid-payment → no double charge, no lost order, ledger always balanced.
@@ -23,7 +23,7 @@
 - SAST (Semgrep or CodeQL) and secret scanning (gitleaks) on every pull request.
 - DAST (OWASP ZAP) on every page and API in staging, covering OWASP Top 10, API Top 10 and LLM Top 10.
 - Security E2E tests: PIN brute force + lockout, link replay/expiry/tampering, webhook signature forgery and replay, IDOR/access control between users, vendors and staff, SQL injection, XSS, CSRF, rate limits, prompt injection.
-- Third-party penetration test before launch and yearly; responsible disclosure channel (security.txt on heydovo.com).
+- Third-party penetration test before launch and yearly; responsible disclosure channel (security.txt on heydovo.com, served by apps/website).
 - Daily re-scan of deployed images/dependencies for newly published CVEs, with alerts.
 
 ## CI/CD pipeline

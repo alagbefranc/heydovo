@@ -19,18 +19,32 @@ The ONLY service that moves money. Double-entry ledger, wallet top-ups, holds, c
 - Vendors: Stripe Connect accounts [CONFIRM Express vs Standard]; onboarding link from the vendor portal; weekly transfers.
 
 ## Key logic
-- `hold` / `capture(splits)` / `release` / `refund` exactly as docs/ALGORITHMS.md §6; every call idempotent; every ledger post has a unique entry_key.
+- `hold` / `capture(splits)` / `release` / `refund` exactly as docs/ALGORITHMS.md §6; every call idempotent; every ledger post has a unique entry_key. Capture splits include the tax lines and, when the booked courier fee is higher than the fee shown, the delivery subsidy line (§3, §6).
 - Balance = Σ entries for user_wallet (cache allowed, rebuilt in reconciliation).
 - Limits, velocity and fraud checks before holds and top-ups; refunds above threshold need two staff approvals (admin-service supplies approvals).
 - Daily reconciliation vs Stripe balance transactions; alert on mismatch.
 - Payout Workflow (§13) with dispute buffer and reserves.
 
+## Allowed callers
+| Method | Allowed callers |
+|--------|-----------------|
+| `hold`, `capture`, `release`, `createPaymentLink` | order-booking-service |
+| `refund` | order-booking-service; admin-service (with the approvals the amount requires) |
+| `runPayouts`, `getLedger` | admin-service (payouts also run on this service's own weekly schedule) |
+| `getBalance` | agent-orchestrator, mcp-connector-service, order-booking-service, user-service (account closing), admin-service |
+| `createTopUpLink` | agent-orchestrator, mcp-connector-service, api-gateway for secure-pages (top-up page; the request carries a valid `topup` link token) |
+| `createConnectOnboardingLink` | api-gateway for vendor-portal (vendor owner role) |
+
+- Implement this as one named entrypoint (`WorkerEntrypoint`) per caller, each exposing only that caller's methods and bound only to that caller in `wrangler.jsonc`. A Worker then cannot address a method it is not allowed to use.
+- The agent, the MCP connector and the web apps can never reach `hold`, `capture`, `release`, `refund` or payouts.
+- Stripe webhooks arrive on this service's own public webhook route and are trusted only after signature verification.
+
 ## Events
 Publishes: payment.succeeded, payment.failed, wallet.topped_up, hold.created, hold.captured, hold.released, refund.issued, payout.sent, payout.failed, chargeback.opened.
-Consumes: none for money movement (commands come by RPC from order-booking and admin-service only); dispute.resolved for reserves.
+Consumes: none for money movement (money-moving commands come by RPC, only from the callers in the table above); dispute.resolved for reserves.
 
 ## Must never
-- Accept a money command from the agent or a web app directly (only order-booking-service and admin-service, verified by service binding identity). Store card data. Update or delete ledger rows. Post unbalanced transactions.
+- Accept any method from a caller outside the allowed-caller table. Store card data. Update or delete ledger rows. Post unbalanced transactions.
 
 ## Tests
-Property-based tests: ledger always balances; no double post under retries/concurrency; holds never exceed balance; capture splits add up to the hold; refunds never exceed captured; webhook replay/forgery; reconciliation mismatch detection; payout reserves; limits.
+Property-based tests: ledger always balances; no double post under retries/concurrency; holds never exceed balance; capture splits add up to the hold (the delivery subsidy pair is extra and nets to zero); every method rejects callers outside the allowed-caller table; refunds never exceed captured; webhook replay/forgery; reconciliation mismatch detection; payout reserves; limits.
