@@ -96,7 +96,7 @@ Every tool has a strict JSON schema in `packages/contracts/src/agent-tools`. The
 | get_balance | wallet.getBalance | verified user |
 | create_topup_link | wallet.createTopUpLink | verified user |
 | track | order.getStatus | own orders only |
-| cancel | order.cancel | own orders only; shows the refund amount first; then the confirm button for that message (WhatsApp/RCS) or, on SMS, `YES <code>` with the one-time code from that message |
+| cancel | order.cancel | own orders only; shows the refund amount first; then the confirm button for that message or a plain YES. On SMS, when the refund is less than the amount paid, `YES <code>` with the one-time code from that message instead |
 | switch_fulfilment | order.switchFulfilment | before vendor accepts |
 | open_dispute | reviews.openDispute | own orders only |
 | leave_review | reviews.createReview | completed orders only |

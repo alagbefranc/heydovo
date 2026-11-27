@@ -28,7 +28,7 @@ Security first. Follow OWASP Top 10, OWASP API Security Top 10 and OWASP Top 10 
 - Customers: phone OTP at registration; re-verify after 90 days inactive, after a PIN or card exposure in chat, before unusually large orders, or on suspicious signals (number recycling / SIM swap risk). Consider carrier lookup on the number before large payments [CONFIRM Telnyx Number Lookup].
 - Vendors and staff: Supabase Auth, strong passwords, mandatory 2FA, session timeouts, role-based access (owner, manager, staff / owner, support, finance, ops).
 - Admin portal behind Cloudflare Zero Trust Access in addition to app login.
-- Commands by SMS (vendor commands, customer cancellations) count only with the one-time reply code from our own message to that phone, because SMS sender numbers can be faked. WhatsApp verifies the sender; RCS [CONFIRM] (docs/ALGORITHMS.md §14).
+- SMS sender numbers can be faked. By SMS, the commands that cost money or stop a store (READY for a delivery order, PAUSE, a cancellation that costs the customer money) count only with the one-time reply code from our own message to that phone. Low-risk commands (YES, NO, RESUME) stay plain to keep the conversation smooth: each is confirmed back to the registered phone, and an unusual pattern switches that number to codes for an hour. WhatsApp verifies the sender; RCS [CONFIRM] (docs/ALGORITHMS.md §14).
 
 ## Platform
 - TLS everywhere (HSTS); encryption at rest (Supabase, R2).

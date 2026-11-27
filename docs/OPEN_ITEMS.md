@@ -34,10 +34,10 @@ Search the repo for `[CONFIRM]` too. Resolve these before the related build step
 
 ## Security design items raised in review
 These came out of the independent security review of this pack. They are weaknesses in the original design that have not been changed yet. Decide each one before the build step named.
-Decided on 2026-11-27 and written into the docs: a spending hold after a PIN reset, PIN approvals that the wallet redeems itself, reply codes for commands sent by SMS, and no pickup code on the tracking page.
+Decided on 2026-11-27 and written into the docs: a spending hold after a PIN reset, PIN approvals that the wallet redeems itself, reply codes by SMS only for the commands that cost money or stop the store, and no pickup code on the tracking page.
 - The two-person refund rule lives only in admin-service; `wallet.refund` carries no evidence of the approvals (steps 12, 19).
 - auth-security has no allowed-caller table of its own: any Worker that binds it can create secure links for any user, start a PIN reset or require re-verification (step 6).
-- On SMS the sender's phone number is the identity for chat, and it can be faked. Vendor commands and cancellations now need a reply code, but a faked customer number can still change an address, open a dispute or leave a review (steps 8, 16).
+- On SMS the sender's phone number is the identity for chat, and it can be faked. The commands that cost money or stop a store need a reply code. By choice (low friction), plain accept and decline, RESUME, address changes, disputes and reviews do not; they rely on the confirmation message, the dashboard and the step-up rule (steps 8, 16).
 - Secret masking covers text messages only, not voice transcripts, MCP tool arguments or photo captions (steps 16, 21, 22).
 - Meta Muse account linking uses phone OTP only, and PIN links are returned to the MCP client (step 22).
 - Terraform-managed Hyperdrive configs and database roles put role passwords in Terraform state, against the infra rule (step 3).

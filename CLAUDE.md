@@ -10,6 +10,9 @@ Users text or call one number. Dovo:
 - pays from a prepaid wallet (approved with a PIN on a secure web page) or a one-time payment link.
 Vendors run their business in the vendor portal. Staff run the platform from the admin portal. The public website (landing page, `/start` link, legal pages) is `apps/website`.
 
+## Product principle
+The conversation is the product. Keep every customer and vendor flow as low-friction as it can safely be: buttons before typing, one plain word where the risk is low, and an extra step (a code, a confirmation) only where a mistake or a faked message would cost money or stop a store. Vendors run orders by text while the dashboard shows the same orders. Details: `docs/CONVERSATION.md`, "Guiding principle".
+
 ## Golden rules (never break these)
 1. Work on ONE service or ONE app per session. Say which one at the start.
 2. Before coding, read: this file → `docs/ARCHITECTURE.md` → `docs/CONTRACTS.md` → the target folder's `CLAUDE.md` → any doc it points to.

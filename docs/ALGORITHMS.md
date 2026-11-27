@@ -152,17 +152,23 @@ Launch uses one courier provider, Uber Direct. The steps are written for any num
 Weekly [CONFIRM day]. For each vendor: payable = vendor_payable balance for orders completed > 7 days ago (dispute buffer) − open dispute reserves. Transfer via Stripe Connect; emit `payout.sent` with a statement. Failed transfers retry and alert.
 
 ## 14. Vendor text commands (agent-orchestrator, deterministic, no AI)
-From a verified vendor staff phone only: `YES` accept · `NO <reason>` decline · `READY` · `PICKED <pickup code>` · `PAUSE` / `RESUME` · `HELP`.
+From a verified vendor staff phone only: `YES` accept · `NO <reason>` decline · `READY` · `PICKED <pickup code>` · `PAUSE` / `RESUME` · `HELP`. Text and the dashboard are two views of the same orders: a command by text shows in the dashboard at once, and the other way round.
 
-An SMS sender number can be faked, so a command that arrives by SMS counts only with the one-time reply code from our own message to that phone:
-- Every message that invites a command carries a 3-character reply code from the pickup-code alphabet (§16), for example "New order D4821 … Reply YES 7K2 to accept or NO 7K2 <reason> to decline", and after acceptance "Reply READY 4F9 when it is ready". The code identifies the order and the step, so no order ref is needed.
-- `PAUSE` and `RESUME` are not replies to an alert, so we answer "Reply PAUSE 9CX to confirm" and act only on that reply.
-- `PICKED <pickup code>` already needs the customer's pickup code. `HELP` needs no code.
-- Codes come from auth-security (`issueActionCode` / `verifyActionCode`): bound to the phone, the action and the order, single use, hashed at rest, valid until the step ends (10 min for PAUSE and RESUME).
-- 5 wrong codes from a number within an hour → SMS commands from that number are off for an hour (the portal and WhatsApp still work), and the vendor owner and staff are alerted.
-- WhatsApp: button taps and replies count without a code, because the channel verifies the sender. RCS: the same once Telnyx confirms the sender of an inbound RCS message is verified [CONFIRM]; until then RCS follows the SMS rule. A message that fell back to SMS follows the SMS rule.
+Keep it low-friction (docs/CONVERSATION.md, guiding principle). On WhatsApp and RCS every alert carries buttons (Accept / Decline, Mark ready, Pause store), and a tap is all it takes. By typed text, most commands are one plain word:
+- `YES` and `NO <reason>` are plain. `YES D4821` names the order; if the vendor has exactly one pending order, `YES` / `NO` without a ref applies to it; otherwise ask which.
+- `RESUME`, `HELP`, and `READY` for a pickup order are plain too.
+- Every command is answered with a short confirmation to the registered phone ("D4821 accepted"), so the real vendor sees at once if someone else sent it.
 
-The same rule protects customer cancellations: after the refund amount is shown, a cancellation by SMS needs `YES <code>` with the code from that message (docs/CONTRACTS.md, `cancel` tool).
+An SMS sender number can be faked. So by SMS, and only for the commands that cost money or stop the store, a command counts only with the one-time reply code from our own message to that phone:
+- `READY` for a delivery order, because it books a courier that the platform pays for. The acceptance confirmation says exactly what to send: "D4821 accepted. When it is ready, reply READY 4F9."
+- `PAUSE`, because it stops the store. We answer "Reply PAUSE 9CX to confirm" and act only on that reply.
+- `PICKED <pickup code>` already needs the customer's pickup code.
+- Codes are 3 characters from the pickup-code alphabet (§16) and come from auth-security (`issueActionCode` / `verifyActionCode`): bound to the phone, the action and the order, single use, hashed at rest, valid until the step ends (10 min for PAUSE).
+- 5 wrong codes from a number within an hour → coded commands by SMS from that number are off for an hour (the dashboard, WhatsApp and plain commands still work), and the vendor owner and staff are alerted.
+- Unusual plain commands by SMS (for example three declines in a row within 30 minutes, or repeated commands for refs that are not pending) → every command from that number needs a code for the next hour, and the owner and staff are alerted.
+- WhatsApp verifies the sender, so taps and typed commands there never need a code. RCS: the same once Telnyx confirms the sender of an inbound RCS message is verified [CONFIRM]; until then the two coded commands on RCS follow the SMS rule. A message that fell back to SMS follows the SMS rule.
+
+Customer cancellations follow the same idea (docs/CONTRACTS.md, `cancel` tool). After the refund amount is shown, the confirm button or a plain YES is enough when the refund is the full amount. Only when cancelling would cost the customer money (the refund is less than they paid) does a cancellation by SMS need `YES <code>` with the code from that message.
 
 ## 15. Secret masking (messaging-gateway, with a check by auth-security)
 Runs in memory before any inbound text is stored, logged, queued or forwarded. Two goals: a real PIN, OTP or card number never reaches storage, logs or the AI; and an ordinary number (house number, buzzer code, quantity) does not force a PIN reset.

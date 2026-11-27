@@ -14,6 +14,7 @@ AppShell, StatCard, OrderInboxList, OrderCard (accept/decline countdown), Status
 - Role-based UI (owner, manager, staff); hide what a role can't do, and the API still enforces it.
 - Customer data shown: first name, items, delivery address only when needed; never phone numbers.
 - Works well on a cheap Android phone on 4G.
+- The portal and text commands are two views of the same orders: an action taken by text shows here at once, and the other way round (docs/ALGORITHMS.md §14).
 
 ## Tests
 Playwright per page (mobile + desktop, EN/FR, axe AA), role matrix, realtime arrival, accept timeout UI, bulk upload errors, document upload limits, 2FA enforcement.
