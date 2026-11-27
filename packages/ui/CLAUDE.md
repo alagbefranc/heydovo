@@ -13,3 +13,4 @@ The shared design system for all four web apps (website, secure-pages, vendor-po
 - WCAG 2.2 AA: contrast, focus states, keyboard, screen-reader labels, 44px touch targets.
 - No app-specific business logic in this package.
 - Visual regression + axe tests for every component.
+- docs/design/VENDOR_PORTAL.md lists provisional tokens and the components the vendor dashboard needs. Replace the token values with the Figma ones when the link arrives; keep the token names.

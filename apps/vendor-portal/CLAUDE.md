@@ -26,3 +26,4 @@ Playwright per page (mobile + desktop, EN/FR, axe AA), role matrix, realtime arr
 - A short "Running orders by text" help page: the commands, when a code is needed, and that text and the dashboard are the same orders.
 - Earnings uses `wallet.getVendorStatement` (owner only). Seller tax details form if the accountant confirms it is needed (docs/LAUNCH.md).
 - Added tests: an action taken by text appears in the open dashboard without a reload; two people acting at once; phone verification; statements hidden from non-owners.
+- Design: docs/design/VENDOR_PORTAL.md (screens, behaviour, provisional tokens and the patterns borrowed). Build to it; ask before departing from it.
