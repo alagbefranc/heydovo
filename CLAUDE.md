@@ -44,7 +44,7 @@ Vendors run their business in the vendor portal. Staff run the platform from the
 - Supabase Postgres in a Canadian region (one schema + one DB role per service) via Hyperdrive. PostGIS, pgvector, full-text search, Row Level Security, Realtime, Supabase Auth (vendor/admin logins with 2FA).
 - OpenAI (tool calling) through Cloudflare AI Gateway.
 - Telnyx for all messaging and voice on one number: RCS with automatic SMS/MMS fallback, WhatsApp, and phone calls via Telnyx Voice AI.
-- Stripe (wallet top-ups, payment links, Connect payouts). DoorDash Drive + Uber Direct (in-house drivers later).
+- Stripe (wallet top-ups, payment links, Connect payouts). Uber Direct for courier delivery (in-house drivers later).
 - Next.js web apps on Workers with Meta's Astryx design system, themed from our Figma.
 - Tests: Vitest, Playwright, axe, k6, OWASP ZAP, Semgrep/CodeQL, Trivy/Snyk, Checkov. CI: GitHub Actions + Wrangler. Infra: Terraform.
 

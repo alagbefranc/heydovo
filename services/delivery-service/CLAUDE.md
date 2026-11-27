@@ -1,7 +1,7 @@
 # delivery-service
 
 ## Purpose
-Courier delivery behind one internal interface. Providers: DoorDash Drive and Uber Direct now; in-house drivers later (feature flag). We hold one business account per provider; vendors need no courier accounts. Read docs/ALGORITHMS.md §11.
+Courier delivery behind one internal interface. Provider at launch: Uber Direct only. The interface stays provider-neutral so a second courier or in-house drivers can be added later (feature flag). We hold the Uber Direct business account; vendors need no courier accounts. Read docs/ALGORITHMS.md §11.
 
 ## Owns (schema `delivery`)
 - `quotes` (id, provider, pickup snapshot, dropoff snapshot, fee_cents, eta_at, expires_at, provider_quote_id)
@@ -18,18 +18,18 @@ interface DeliveryProvider {
   get(id: string): Promise<Delivery>;
 }
 ```
-Adapters: `DoorDashDriveAdapter` (https://developer.doordash.com/en-US/api/drive/), `UberDirectAdapter` (https://developer.uber.com/docs/deliveries/overview), `InHouseAdapter` (later).
+Adapters: `UberDirectAdapter` (https://developer.uber.com/docs/deliveries/overview), `InHouseAdapter` (later).
 
 ## Key logic
-- Parallel quotes, selection rule, fallbacks (§11). Re-quote if expired; never charge the user more than the summary (platform absorbs). `book` returns the booked `feeCents` so order-booking can pass any difference to the ledger as a delivery subsidy.
+- Quotes, selection rule and fallbacks (§11). With Uber Direct as the only provider, no coverage or an outage falls back to vendor self-delivery if enabled, then to offering pickup. Re-quote if expired; never charge the user more than the summary (platform absorbs). `book` returns the booked `feeCents` so order-booking can pass any difference to the ledger as a delivery subsidy.
 - Book on `order.ready` (or schedule at ready_by where supported); cancel if the order is cancelled before pickup.
-- Webhooks verified [CONFIRM DoorDash and Uber Direct signing methods], deduped, mapped to our statuses.
+- Webhooks verified [CONFIRM Uber Direct signing method], deduped, mapped to our statuses.
 - Share only the data couriers need (first name, address, delivery notes; phone only if the provider requires it, as disclosed in the Privacy Policy).
-- Production access: DoorDash Drive production access is currently restricted with no timeline; build against sandboxes; apply for Uber Direct in parallel.
+- Production access: build against the Uber Direct sandbox and apply for Uber Direct production access early [CONFIRM approval and timeline].
 
 ## Events
 Publishes: delivery.quoted, delivery.created, delivery.assigned, delivery.picked_up, delivery.delivered, delivery.cancelled, delivery.failed.
 Consumes: none directly (order-booking calls `book`/`cancel`).
 
 ## Tests
-Adapter contract tests against sandboxes, selection rule cases, timeout/fallback, quote expiry + fee absorb, webhook verification/dedupe/out-of-order, cancellation.
+Uber Direct adapter contract tests against its sandbox, selection rule cases (written against the interface with fake providers, so a second provider can be added later), timeout and outage fallback to self-delivery and pickup, quote expiry + fee absorb, webhook verification/dedupe/out-of-order, cancellation.

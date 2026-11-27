@@ -59,8 +59,8 @@ In those cases, build and test against the typed fakes in `packages/sdk`, and li
 **Done when:** PostGIS candidate queries, document expiry job, slots and RLS (including the tests in its CLAUDE.md) tested.
 
 ### Step 10 — `services/delivery-service`
-> Build the `DeliveryProvider` interface with the DoorDash Drive and Uber Direct adapters against their sandboxes, parallel quotes with the selection and fallback rules (docs/ALGORITHMS.md §11), booking that returns the booked fee, cancellation, re-quotes with the fee-absorb rule, and verified, deduped webhooks.
-**Done when:** both adapters pass sandbox contract tests; selection, fallback and fee-absorb rules tested.
+> Build the provider-neutral `DeliveryProvider` interface with the Uber Direct adapter against its sandbox (the only courier at launch), quotes with the selection and fallback rules (docs/ALGORITHMS.md §11), booking that returns the booked fee, cancellation, re-quotes with the fee-absorb rule, and verified, deduped webhooks.
+**Done when:** the Uber Direct adapter passes sandbox contract tests; selection, fallback (self-delivery, then pickup) and fee-absorb rules tested.
 
 ### Step 11 — `services/catalogue-quotes-service`
 > Build products, services, bulk upload, hybrid search (full-text EN/FR + pgvector merged with RRF, synonyms), embedding jobs on a Queue, the ranking algorithm (docs/ALGORITHMS.md §1–2) using vendor-service and delivery-service, and the quote lifecycle.

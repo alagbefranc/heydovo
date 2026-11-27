@@ -130,6 +130,7 @@ NEW → LANGUAGE → NAME → ADDRESS (geocode + served-area check; not served �
 - Re-verification required after 90 days inactive, after `security.secret_exposed`, or on suspicious signals.
 
 ## 11. Delivery provider selection (delivery-service)
+Launch uses one courier provider, Uber Direct. The steps are written for any number of enabled providers so a second courier or in-house drivers can be added later without changing the rule; with one provider, steps 1–3 come down to getting the Uber Direct quote (timeout 3 s).
 1. Get quotes from all enabled providers for the area in parallel (timeout 3 s each).
 2. Drop providers with no coverage or errors.
 3. Choose the lowest fee, unless its ETA is more than 15 min later than the fastest; then choose the fastest.

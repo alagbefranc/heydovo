@@ -31,7 +31,7 @@ Security first. Follow OWASP Top 10, OWASP API Security Top 10 and OWASP Top 10 
 ## Platform
 - TLS everywhere (HSTS); encryption at rest (Supabase, R2).
 - Secrets only in Cloudflare Secrets Store / Wrangler secrets; rotate regularly; never logged.
-- Webhooks verified by signature/secret and timestamp (replay protection), deduped by provider event id: Telnyx messaging, RCS, WhatsApp and voice (Ed25519 signature + timestamp) [CONFIRM headers], Stripe (Stripe-Signature), DoorDash [CONFIRM], Uber Direct [CONFIRM].
+- Webhooks verified by signature/secret and timestamp (replay protection), deduped by provider event id: Telnyx messaging, RCS, WhatsApp and voice (Ed25519 signature + timestamp) [CONFIRM headers], Stripe (Stripe-Signature), Uber Direct [CONFIRM].
 - Cloudflare WAF managed rules, bot protection, rate limiting on all public routes; Turnstile on secure pages and portal logins; API Shield schema validation on the api-gateway.
 - Least privilege: each Worker gets only the bindings it needs; each DB role only its schema; RLS on vendor-facing tables.
 - RLS through Hyperdrive: set the tenant id (for example `app.vendor_id`) with `set_config(name, value, true)` inside the same short transaction as the queries that need it. Hyperdrive resets a connection when it returns to the pool, so a session-level `SET` does not reach the next query. Policies fail closed when the setting is missing, tables use `FORCE ROW LEVEL SECURITY` (a table's owner skips RLS otherwise), and every query still filters by tenant id itself.

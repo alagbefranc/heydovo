@@ -46,7 +46,7 @@ Each service = one Worker + one Postgres schema + one DB role + its own tests, m
 | 6 | catalogue-quotes-service | products, services, quotes, ranking weights, synonyms | Search, quotes, vendor ranking |
 | 7 | order-booking-service | orders, items, bookings, status history | Order/booking lifecycles; orchestrates payment + delivery |
 | 8 | wallet-payments-service | ledger, wallets, holds, payment intents, payouts | The ONLY service that moves money |
-| 9 | delivery-service | deliveries, quotes, provider config | DoorDash Drive / Uber Direct (in-house later) behind one interface |
+| 9 | delivery-service | deliveries, quotes, provider config | Uber Direct (in-house drivers later) behind one interface |
 | 10 | notification-service | notification log, preferences, push subscriptions | Alerts outside the chat: vendor SMS, email, web push, admin alerts |
 | 11 | reviews-disputes-service | reviews, disputes, dispute messages | Ratings, vendor replies, dispute cases and outcomes |
 | 12 | mcp-connector-service | linked MCP accounts | Public MCP endpoint for Meta Muse |
@@ -105,7 +105,7 @@ mcp-connector-service exposes MCP tools that call the same service APIs, with th
 
 ## Failure handling
 - RCS unavailable for a recipient → Telnyx automatic SMS/MMS fallback. Telnyx outage → queue outbound messages with retries and alert; optional second SMS provider later behind the same adapter interface.
-- Courier down or no coverage → other provider → vendor self-delivery → offer pickup.
+- Uber Direct down or no coverage → vendor self-delivery if enabled → offer pickup. Uber Direct is the only courier at launch, so this is the whole fallback.
 - OpenAI down → fallback model via AI Gateway → templated apology + human handoff.
 - Provider webhook retries → dedupe on provider event id.
 - Payment retries can never double-charge (idempotency keys + unique ledger keys per order and entry type).
