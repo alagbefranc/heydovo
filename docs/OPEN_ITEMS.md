@@ -21,7 +21,7 @@ Search the repo for `[CONFIRM]` too. Resolve these before the related build step
 - Payout day and dispute buffer.
 - Figma link for the design tokens.
 - Policy numbers in brackets in the legal drafts (refund windows, notice periods).
-- Delivery fee when the booked courier fee is lower than the fee shown: return the difference to the user, or keep the fee shown.
+- Delivery fee wording: the customer pays the fee quoted, and the platform absorbs increases and keeps decreases (legal check); how long an Uber Direct quote stays valid.
 - Uber Direct billing cycle for reconciling delivery payables.
 - Existing landing page: where it lives, and whether to import it into apps/website or design a new one.
 - Website: what each provider needs to see on it for approval (RCS brand verification, WhatsApp business verification, Stripe, SMS sender registration); security.txt contact address; analytics consent under Law 25.
@@ -29,15 +29,15 @@ Search the repo for `[CONFIRM]` too. Resolve these before the related build step
 - Telnyx keywords: support for custom opt-in/opt-out words, and whether Telnyx or the carriers treat CANCEL, END or QUIT as opt-out words by default (CANCEL is our "cancel my order" shortcut).
 - Hostnames for vendor-portal and admin-portal (each on its own hostname, not a path on heydovo.com).
 - Telnyx webhook time limit (the secret-masking check must finish before the ack).
+- SIM-change lookup: Telnyx Number Lookup availability in Canada, and the block length after a reported change (default 72 hours).
+- RCS: whether the sender of an inbound RCS message is verified (decides whether RCS commands need a reply code).
 
 ## Security design items raised in review
 These came out of the independent security review of this pack. They are weaknesses in the original design that have not been changed yet. Decide each one before the build step named.
-- PIN reset needs only an OTP sent to the same phone, so the PIN does not protect against someone holding the phone or the SIM (step 6).
-- `wallet.hold` carries no proof that the PIN was verified. Approval arrives as a `pin.verified` event, and nothing restricts which Worker may publish it (steps 6, 12, 13).
+Decided on 2026-11-27 and written into the docs: a spending hold after a PIN reset, PIN approvals that the wallet redeems itself, reply codes for commands sent by SMS, and no pickup code on the tracking page.
 - The two-person refund rule lives only in admin-service; `wallet.refund` carries no evidence of the approvals (steps 12, 19).
 - auth-security has no allowed-caller table of its own: any Worker that binds it can create secure links for any user, start a PIN reset or require re-verification (step 6).
-- The sender's phone number is the identity for chat and for vendor text commands. SMS sender numbers can be spoofed, so a spoofed vendor staff number could pause a store or accept and decline orders (steps 8, 16).
-- The 7-day `track` link shows the pickup code, so anyone holding that link can collect the order (steps 6, 14).
+- On SMS the sender's phone number is the identity for chat, and it can be faked. Vendor commands and cancellations now need a reply code, but a faked customer number can still change an address, open a dispute or leave a review (steps 8, 16).
 - Secret masking covers text messages only, not voice transcripts, MCP tool arguments or photo captions (steps 16, 21, 22).
 - Meta Muse account linking uses phone OTP only, and PIN links are returned to the MCP client (step 22).
 - Terraform-managed Hyperdrive configs and database roles put role passwords in Terraform state, against the infra rule (step 3).

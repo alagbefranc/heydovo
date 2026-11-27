@@ -22,7 +22,7 @@
 - Infrastructure-as-code scanning (Checkov) for Terraform and Wrangler configs; SBOM generated for every build.
 - SAST (Semgrep or CodeQL) and secret scanning (gitleaks) on every pull request.
 - DAST (OWASP ZAP) on every page and API in staging, covering OWASP Top 10, API Top 10 and LLM Top 10.
-- Security E2E tests: PIN brute force + lockout, link replay/expiry/tampering, webhook signature forgery and replay, IDOR/access control between users, vendors and staff, SQL injection, XSS, CSRF, rate limits, prompt injection.
+- Security E2E tests: PIN brute force + lockout, link replay/expiry/tampering, webhook signature forgery and replay, IDOR/access control between users, vendors and staff, SQL injection, XSS, CSRF, rate limits, prompt injection, a forged `pin.verified` event (no hold without a redeemed approval), vendor commands and cancellations by SMS with a missing or wrong reply code, the wallet cap after a PIN reset.
 - Third-party penetration test before launch and yearly; responsible disclosure channel (security.txt on heydovo.com, served by apps/website).
 - Daily re-scan of deployed images/dependencies for newly published CVEs, with alerts.
 

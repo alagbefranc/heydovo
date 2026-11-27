@@ -11,6 +11,7 @@ Security first. Follow OWASP Top 10, OWASP API Security Top 10 and OWASP Top 10 
 
 ## Payments and money
 - Idempotency keys on every payment, order, booking, refund. Unique ledger keys per (refType, refId, entryKind).
+- The wallet holds a user's funds only against a one-time PIN approval that it redeems with auth-security itself (bound to user, order, amount and summary). An event alone never moves money, and only auth-security may publish `pin.*` events (CI-checked Queue producer allow-list).
 - Double-entry ledger; daily reconciliation with Stripe; alerts on mismatch.
 - No card data on our systems; Stripe Checkout / Elements only (keeps PCI scope minimal, SAQ A target).
 - Spending limits, velocity checks and fraud scoring before holds and top-ups.
@@ -19,7 +20,7 @@ Security first. Follow OWASP Top 10, OWASP API Security Top 10 and OWASP Top 10 
 - wallet-payments-service exposes each method only to the callers in its allowed-caller table, enforced by per-caller entrypoints plus a CI check of every Worker's service bindings (the callee cannot see who binds it). Money-moving methods (hold, capture, release, refund, payouts) and `createConnectOnboardingLink` (it decides where payouts go) are never directly reachable from the agent, the MCP connector or a web app; staff reach refunds and payouts only through admin-service with its approvals and audit log.
 
 ## PIN, OTP, links
-- See docs/ALGORITHMS.md sections 7–9. Peppered argon2id, constant-time compare, 5-attempt lockout, PIN only on secure pages.
+- See docs/ALGORITHMS.md sections 7–9. Peppered argon2id, constant-time compare, 5-attempt lockout, PIN only on secure pages. After a PIN reset, wallet approvals are capped ($50 in total for 24 hours by default) and the owner is alerted; a reported SIM change blocks them until staff review.
 - Secure links: random 256-bit tokens, hashed at rest, single use, short TTL, bound to purpose/amount/summary, no PII in URLs.
 - Inbound messages masked for PINs, OTPs and card numbers before storage or AI. PIN/OTP candidates are checked against the sender's own PIN and live OTP, so an ordinary number (house number, buzzer code) is not treated as a leak and does not force a PIN reset (docs/ALGORITHMS.md §15).
 
@@ -27,6 +28,7 @@ Security first. Follow OWASP Top 10, OWASP API Security Top 10 and OWASP Top 10 
 - Customers: phone OTP at registration; re-verify after 90 days inactive, after a PIN or card exposure in chat, before unusually large orders, or on suspicious signals (number recycling / SIM swap risk). Consider carrier lookup on the number before large payments [CONFIRM Telnyx Number Lookup].
 - Vendors and staff: Supabase Auth, strong passwords, mandatory 2FA, session timeouts, role-based access (owner, manager, staff / owner, support, finance, ops).
 - Admin portal behind Cloudflare Zero Trust Access in addition to app login.
+- Commands by SMS (vendor commands, customer cancellations) count only with the one-time reply code from our own message to that phone, because SMS sender numbers can be faked. WhatsApp verifies the sender; RCS [CONFIRM] (docs/ALGORITHMS.md §14).
 
 ## Platform
 - TLS everywhere (HSTS); encryption at rest (Supabase, R2).

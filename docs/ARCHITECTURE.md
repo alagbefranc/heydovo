@@ -74,7 +74,7 @@ Each service = one Worker + one Postgres schema + one DB role + its own tests, m
 1. Agent: `catalogue.searchProducts` (ranked, nearest first) → `delivery.quote` → `order.createDraft` (returns summary, totals, summaryHash).
 2. Agent sends the summary. User replies YES (deterministic check) → `order.requestConfirmation`.
 3. order-booking asks auth-security for a PIN link bound to orderId + amount + summaryHash → agent sends the link.
-4. User enters PIN on secure-pages → `pin.verified` → order-booking calls `wallet.hold` → order CONFIRMED → `order.confirmed`.
+4. User enters PIN on secure-pages → `pin.verified` with a one-time approval → order-booking calls `wallet.hold` with that approval, which wallet redeems with auth-security → order CONFIRMED → `order.confirmed`.
 5. Vendor accepts (portal or YES by text) → `order.accepted` → prepares → `order.ready`.
 6. order-booking calls `delivery.book` → `delivery.assigned` → `delivery.picked_up` → `delivery.delivered`.
 7. `order.completed` → order-booking calls `wallet.capture` → ledger splits fee, commission, delivery cost, tax, vendor payable.

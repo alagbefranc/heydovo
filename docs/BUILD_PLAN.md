@@ -12,7 +12,7 @@ The order keeps direct (RPC) calls pointing at services from earlier steps where
 - every service reads settings, flags and launch regions that admin-service will own (read them from the KV cache, which infra seeds with the defaults in docs/ALGORITHMS.md);
 - events arrive from services built later;
 - refund approvals come from admin-service;
-- auth-security looks up a sender through user-service for the secret-exposure check.
+- auth-security looks up a sender through user-service for the secret-exposure check, and a number's SIM-change status through messaging-gateway.
 
 In those cases, build and test against the typed fakes in `packages/sdk`, and list them under "Fakes in use" in the folder's `CLAUDE.md`. The later step is not done until it has replaced those fakes with real integration tests.
 
@@ -43,7 +43,7 @@ In those cases, build and test against the typed fakes in `packages/sdk`, and li
 **Done when:** routing, authz matrix, rate limits and error shape tested.
 
 ### Step 6 — `services/auth-security-service`
-> Implement OTP, PIN (peppered argon2id, weak-PIN rules, lockout, reset), secure links, staff/vendor session checks, re-verification and the secret-exposure check, exactly per docs/ALGORITHMS.md §7–9 and §15 and docs/SECURITY.md. Tests first.
+> Implement OTP, PIN (peppered argon2id, weak-PIN rules, lockout, reset), secure links with one-time PIN approvals, the spending hold after a PIN reset, action codes for SMS commands, staff/vendor session checks, re-verification and the secret-exposure check, exactly per docs/ALGORITHMS.md §7–9, §14 and §15 and docs/SECURITY.md. Tests first.
 **Done when:** all security tests in its CLAUDE.md pass; argon2id parameters benchmarked within Workers limits.
 
 ### Step 7 — `services/user-service`

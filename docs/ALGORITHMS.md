@@ -45,7 +45,7 @@ All integer cents. Round half up at each line, never on totals only.
 ```
 itemsSubtotal   = Σ (unitPriceCents × qty)            // live prices re-checked at draft and at confirmation
 itemsTax        = per province and item tax category   // [CONFIRM with accountant: GST/HST/PST/QST and marketplace-facilitator rules]
-deliveryFee     = delivery quote at cost (0 for pickup and trades)
+deliveryFee     = courier fee quoted in the summary (0 for pickup and trades)
 serviceFee      = config.serviceFeeCents (250)
 feesTax         = tax on serviceFee and deliveryFee, per province   // [CONFIRM with accountant: whether each fee is taxable and at what rate]
 tax             = itemsTax + feesTax
@@ -55,7 +55,7 @@ vendorPayable   = itemsSubtotal + vendorCollectedTax − commission − vendorLi
 platformRevenue = serviceFee + commission              // Stripe fees are a platform expense
 ```
 - Tax rates are never hard-coded: `itemsTax` and `feesTax` come from config per province and tax category. `vendorCollectedTax` is `itemsTax` when the vendor remits it; if the platform must remit item tax (marketplace-facilitator rules [CONFIRM]), it is 0 and `itemsTax` goes to `tax_payable`. `feesTax` always goes to `tax_payable`. Whether GST/HST applies to the commission charged to vendors is also [CONFIRM].
-- If a courier re-quote at booking time is higher than the fee shown, the platform absorbs the difference and books it to `delivery_subsidy_expense` (§6). The user is never charged more than the summary. If the booked fee is lower than the fee shown: [CONFIRM: return the difference to the user, or keep the fee shown and book the surplus against `delivery_subsidy_expense`].
+- The delivery fee the user pays is always the fee shown in the summary: never more, never less. If the courier's booked fee is higher, the platform absorbs the difference; if it is lower, the platform keeps it. Both go through `delivery_subsidy_expense` (§6), so the highs and lows net out in one account. Review the net amount monthly in the admin dashboard; if the platform keeps more than it absorbs, lower the quoted fee. [CONFIRM how long an Uber Direct quote stays valid.]
 - Trades: call-out fee is held at booking; the final price needs a new summary + YES (+ PIN if more funds are needed). Commission applies to the final job total before tax.
 
 ## 4. Summary hash and confirmation (order-booking-service + agent-orchestrator)
@@ -89,8 +89,8 @@ Double-entry. Every transaction's entries sum to zero (enforced by a deferred co
 **Transactions** (sign: + debit, − credit, shown as from → to):
 - Top-up succeeded: stripe_clearing → user_wallet.
 - Hold (order confirmed): user_wallet → user_hold.
-- Capture (order completed): user_hold → vendor_payable (itemsSubtotal + vendorCollectedTax − commission), platform_commission_revenue (commission), platform_fee_revenue (service fee), delivery_payable (delivery fee shown), tax_payable (feesTax, plus itemsTax if the platform remits).
-- Delivery subsidy (posted with the capture, when the booked courier fee is higher than the fee shown): delivery_subsidy_expense → delivery_payable for the difference, so `delivery_payable:{provider}` always equals what the provider will bill.
+- Capture (order completed): user_hold → vendor_payable (itemsSubtotal + vendorCollectedTax − commission), platform_commission_revenue (commission), platform_fee_revenue (service fee), delivery_payable (the booked courier fee, up to the delivery fee shown), tax_payable (feesTax, plus itemsTax if the platform remits).
+- Delivery subsidy (posted with the capture, when the booked courier fee differs from the fee shown), so that `delivery_payable:{provider}` always equals what the provider will bill. Booked fee higher: delivery_subsidy_expense → delivery_payable for the difference. Booked fee lower: the rest of the fee shown goes user_hold → delivery_subsidy_expense (a credit that offsets the absorbed amounts).
 - Release (cancelled before capture): user_hold → user_wallet (amount per refund rules; the rest captured as above).
 - Pay-by-link order: stripe_clearing → user_hold, then capture as normal.
 - Refund after capture: reverse the captured lines in proportion, or charge vendor_payable if vendor liable; destination = user_wallet (wallet payments) or card via Stripe refund (link payments).
@@ -110,6 +110,8 @@ Double-entry. Every transaction's entries sum to zero (enforced by a deferred co
 - Store `argon2id(HMAC-SHA256(pepper, pin), salt)`. Pepper from Secrets Store (makes stolen hashes useless without the secret, since 6-digit PINs are otherwise easy to brute-force offline). Tune argon2id parameters to fit Workers CPU/memory limits [CONFIRM by benchmark].
 - Verify with constant-time comparison. 5 consecutive failures → LOCKED (wallet spending blocked) → `pin.locked`. Unlock = OTP + set a new PIN.
 - RESET_REQUIRED (`pins.reset_required_at`), set when the PIN was exposed in chat (§15): `verifyPin` fails with `PIN_RESET_REQUIRED`, open `pin_approve` links are voided and wallet spending is blocked, exactly as for LOCKED. Cleared only by OTP + a new PIN that differs from the old one.
+- After any PIN reset (forgotten PIN, LOCKED or RESET_REQUIRED; not the first PIN at onboarding): for `config.postResetHoldHours` (default 24) wallet approvals are capped at `config.postResetCapCents` in total (default 5000 = $50). order-booking asks `auth.getSpendAllowance(userId)` when it builds a draft's payment plan, so the summary already shows the split; `createSecureLink` for `pin_approve` enforces the same limit and fails with `PIN_RESET_HOLD` above it. Anything over the cap is paid by payment link (split payment); pay-by-link is never affected. `pin.reset` triggers an alert by text (`pin.reset_alert`), and by email if one is on file, saying the PIN was changed and how to report it.
+- Before a reset, look up the number for a recent SIM change or port (Telnyx Number Lookup, through messaging-gateway, which owns the Telnyx integration [CONFIRM availability in Canada]). If the lookup reports one: wallet approvals are blocked completely for `config.simChangeHoldHours` (default 72 [CONFIRM]), a risk signal is raised and staff review the account. If the lookup is unavailable, the standard 24-hour cap applies.
 - PIN never travels through chat, logs, analytics, AI or email. Only the secure page posts it, over TLS, directly to auth-security.
 
 ## 8. Secure links (auth-security-service)
@@ -119,7 +121,8 @@ Double-entry. Every transaction's entries sum to zero (enforced by a deferred co
 - URL: `https://heydovo.com/l/{token}` (secure-pages). No personal data in the URL.
 - `resolveLink` returns only what the page must show (first name, order summary, amount).
 - Turnstile check on every POST from these pages.
-- On successful PIN for pin_approve → emit `pin.verified` with the bound fields; order-booking re-checks summaryHash and amount before holding funds.
+- On successful PIN for pin_approve → auth-security records a one-time approval (`approvalId`: 128 random bits; bound to userId, refType, refId, amountCents and summaryHash; valid 10 min) and emits `pin.verified` with the bound fields and the `approvalId`. order-booking re-checks summaryHash and amount, then calls `wallet.hold` with the `approvalId`. Before moving anything, wallet calls `auth.redeemApproval(approvalId, {userId, refType, refId, amountCents}, idempotencyKey)`; auth-security says yes only once, only before expiry and only if every bound field matches (a retry with the same idempotencyKey gets the same answer). No valid approval, no hold: a `pin.verified` event on its own can never move wallet money.
+- Only auth-security may publish `pin.*` and `auth.*` events, and only wallet-payments-service may publish `payment.*`, `hold.*`, `refund.*` and `payout.*`. Queue producer bindings are on the same CI-checked allow-list as service bindings (infra).
 
 ## 9. OTP (auth-security-service)
 6 digits, hashed at rest, TTL 5 min, 5 attempts, max 3 sends per 15 min per number, sent via `message.send` to the same number. Never reuse codes.
@@ -149,7 +152,17 @@ Launch uses one courier provider, Uber Direct. The steps are written for any num
 Weekly [CONFIRM day]. For each vendor: payable = vendor_payable balance for orders completed > 7 days ago (dispute buffer) − open dispute reserves. Transfer via Stripe Connect; emit `payout.sent` with a statement. Failed transfers retry and alert.
 
 ## 14. Vendor text commands (agent-orchestrator, deterministic, no AI)
-From a verified vendor staff phone only: `YES <ref>` accept · `NO <ref> <reason>` decline · `READY <ref>` · `PICKED <pickup code>` · `PAUSE` / `RESUME` · `HELP`. If a vendor has exactly one pending order, `YES`/`NO`/`READY` without a number applies to it; otherwise ask which.
+From a verified vendor staff phone only: `YES` accept · `NO <reason>` decline · `READY` · `PICKED <pickup code>` · `PAUSE` / `RESUME` · `HELP`.
+
+An SMS sender number can be faked, so a command that arrives by SMS counts only with the one-time reply code from our own message to that phone:
+- Every message that invites a command carries a 3-character reply code from the pickup-code alphabet (§16), for example "New order D4821 … Reply YES 7K2 to accept or NO 7K2 <reason> to decline", and after acceptance "Reply READY 4F9 when it is ready". The code identifies the order and the step, so no order ref is needed.
+- `PAUSE` and `RESUME` are not replies to an alert, so we answer "Reply PAUSE 9CX to confirm" and act only on that reply.
+- `PICKED <pickup code>` already needs the customer's pickup code. `HELP` needs no code.
+- Codes come from auth-security (`issueActionCode` / `verifyActionCode`): bound to the phone, the action and the order, single use, hashed at rest, valid until the step ends (10 min for PAUSE and RESUME).
+- 5 wrong codes from a number within an hour → SMS commands from that number are off for an hour (the portal and WhatsApp still work), and the vendor owner and staff are alerted.
+- WhatsApp: button taps and replies count without a code, because the channel verifies the sender. RCS: the same once Telnyx confirms the sender of an inbound RCS message is verified [CONFIRM]; until then RCS follows the SMS rule. A message that fell back to SMS follows the SMS rule.
+
+The same rule protects customer cancellations: after the refund amount is shown, a cancellation by SMS needs `YES <code>` with the code from that message (docs/CONTRACTS.md, `cancel` tool).
 
 ## 15. Secret masking (messaging-gateway, with a check by auth-security)
 Runs in memory before any inbound text is stored, logged, queued or forwarded. Two goals: a real PIN, OTP or card number never reaches storage, logs or the AI; and an ordinary number (house number, buzzer code, quantity) does not force a PIN reset.
@@ -188,4 +201,4 @@ Runs in memory before any inbound text is stored, logged, queued or forwarded. T
 
 ## 16. Identifiers shown to people
 - Order refs: prefix + 4–6 digits, unique per active period, mapped to the UUID internally.
-- Pickup codes: 6 characters from `ABCDEFGHJKMNPQRSTUVWXYZ23456789`, hashed at rest, single use, expire with the order.
+- Pickup codes: 6 characters from `ABCDEFGHJKMNPQRSTUVWXYZ23456789`, hashed at rest, single use, expire with the order. The code is sent only in the chat message when the order is ready (order-booking passes it once, in `order.ready`), is never shown on the tracking page, and is masked in the stored copy of that message.

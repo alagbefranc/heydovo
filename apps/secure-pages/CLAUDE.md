@@ -7,15 +7,15 @@ The short web pages customers open from chat links. Mobile-first, fast, branded,
 `/l/[token]` resolves the link (auth-security `resolveLink`) and renders by purpose:
 - **Setup** (onboarding): OTP → accept Terms + Privacy (links to legal pages) → marketing choice (unticked) → create PIN (twice) → optional email → done → return to chat.
 - **PIN approve**: order summary + amount → PinPad → Next → success → return to chat; wrong PIN shows attempts left; locked shows reset path.
-- **PIN reset**: OTP → new PIN twice.
+- **PIN reset**: OTP → new PIN twice → notice that wallet spending is limited for 24 hours (pay-by-link still works).
 - **Top-up**: amount chips ($25/$50/$100/custom) → Stripe Checkout.
 - **Pay link**: summary → Stripe Checkout (card, Apple Pay, Google Pay).
-- **Track**: read-only order status timeline, courier ETA, pickup code for pickup orders.
+- **Track**: read-only order status timeline and courier ETA. Never the pickup code (it is sent only in the chat message) or anything else that would let someone collect the order.
 - **Privacy request**: access/correct/delete/portability form.
 - Legal pages (`/terms`, `/privacy`, `/refunds`, `/vendor-terms`, EN/FR) live in `apps/website` at `www.heydovo.com`. Link to them; do not copy them here.
 
 ## Components
-BrandHeader, OrderSummaryCard, AmountDisplay, PinPad, OtpInput, ConsentCheckbox, ProgressSteps, AddressConfirm, StatusTimeline, PickupCodeCard, SuccessReturnToChat, ErrorState, ExpiredLinkState, LockedState, LanguageToggle.
+BrandHeader, OrderSummaryCard, AmountDisplay, PinPad, OtpInput, ConsentCheckbox, ProgressSteps, AddressConfirm, StatusTimeline, SuccessReturnToChat, ErrorState, ExpiredLinkState, LockedState, LanguageToggle.
 
 ## Rules
 - This app owns `heydovo.com/l/*` and is the only thing that serves HTML on the apex host; the public website is on `www.heydovo.com`, a separate browser origin. Keep pages and assets under `/l/` (for example Next.js `basePath: '/l'`).

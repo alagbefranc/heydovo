@@ -12,7 +12,7 @@ There is no app UI. The conversation is the product. Implemented mainly in agent
 1. One clarifying question at a time, only when needed.
 2. Before any charge, send a clear summary: vendor, items or service, prices, fees (delivery, $2.50 service fee), taxes, total, ETA or time slot, pickup or delivery, payment source. **(code: summary template + summaryHash)**
 3. Charge only after an explicit YES **(code: deterministic matcher)**, then the PIN link (wallet) or payment link. Anything else is not consent.
-4. Shortcuts: YES, NO, CHANGE, CANCEL, PICKUP (switch a delivery draft to pickup; sends a new summary), MORE, HELP, AGENT (human), BALANCE, STOP (opt out), START. French equivalents: OUI, NON, MODIFIER, ANNULER, RAMASSAGE, PLUS, AIDE, AGENT, SOLDE, ARRÊT, REPRENDRE [CONFIRM the French words RAMASSAGE, PLUS and REPRENDRE with a native speaker].
+4. Shortcuts: YES, NO, CHANGE, CANCEL, PICKUP (switch a delivery draft to pickup; sends a new summary), MORE, HELP, AGENT (human), BALANCE, STOP (opt out), START. French equivalents: OUI, NON, MODIFIER, ANNULER, RAMASSAGE, PLUS, AIDE, AGENT, SOLDE, ARRÊT, REPRENDRE [CONFIRM the French words RAMASSAGE, PLUS and REPRENDRE with a native speaker]. Cancelling an order is confirmed after the refund amount is shown: by button on WhatsApp/RCS, or on SMS with `YES <code>` using the code in that message (docs/ALGORITHMS.md §14).
 5. Proactive updates at each step **(code: templated, not LLM)**: confirmed, accepted, ready, picked up, arriving, delivered; trades: on the way, started, final quote, done.
 6. When unsure, after two failed clarifications, or if the user is upset → offer a human (AGENT).
 7. Photos welcome for repairs and order problems.
@@ -22,7 +22,7 @@ There is no app UI. The conversation is the product. Implemented mainly in agent
 11. Restricted items (alcohol, cannabis, tobacco, weapons, prescription drugs) are refused politely unless admin enables a category with age checks.
 
 ## Message templates (keys live in packages/contracts/src/templates, EN + FR)
-- `summary.product`, `summary.booking`, `confirm.pin_link`, `confirm.pay_link`, `order.confirmed`, `order.accepted`, `order.ready_pickup`, `delivery.picked_up`, `delivery.arriving`, `order.delivered`, `booking.on_the_way`, `booking.final_quote`, `order.cancelled`, `refund.issued`, `wallet.low_balance`, `pin.locked`, `secret.exposed_warning`, `secret.otp_in_chat`, `secret.reminder`, `secret.number_hidden`, `emergency.safety_first`, `handoff.started`, `error.generic`.
+- `summary.product`, `summary.booking`, `confirm.pin_link`, `confirm.pay_link`, `order.confirmed`, `order.accepted`, `order.ready_pickup`, `delivery.picked_up`, `delivery.arriving`, `order.delivered`, `booking.on_the_way`, `booking.final_quote`, `order.cancelled`, `refund.issued`, `wallet.low_balance`, `pin.locked`, `pin.reset_alert`, `pin.reset_hold`, `cancel.confirm`, `secret.exposed_warning`, `secret.otp_in_chat`, `secret.reminder`, `secret.number_hidden`, `emergency.safety_first`, `handoff.started`, `error.generic`.
 
 ## Channel rendering
 - WhatsApp: summaries with YES / CHANGE / CANCEL quick-reply buttons; PIN and payment links as "Approve with PIN" / "Pay now" link buttons; vendor choices as a list; onboarding address via a location request (then confirm the street address).

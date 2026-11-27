@@ -16,6 +16,7 @@ Connects Hey Dovo to **Telnyx**, our single provider for messaging and voice: RC
 - **SMS/MMS**: Canadian long code (or toll-free) on a Telnyx messaging profile; used as the RCS fallback and when a user texts us by SMS. Complete any Canadian sender registration Telnyx requires [CONFIRM].
 - **WhatsApp** (see "WhatsApp details" below): WhatsApp Business Platform through Telnyx on the same number. SMS and voice keep working on that number.
 - **Voice**: the same number receives calls; Telnyx Voice AI assistant answers as Dovo. Its tool webhooks hit `/voice/tools/*`, which forward to agent-orchestrator's voice-session RPC.
+- **Number lookup**: RPC `lookupNumber(phoneE164)` wraps Telnyx Number Lookup and reports a recent SIM change or port. Called only by auth-security before a PIN reset [CONFIRM availability in Canada].
 - Docs: https://developers.telnyx.com (Messaging, RCS, WhatsApp, Voice AI).
 
 ## WhatsApp details

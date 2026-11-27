@@ -56,7 +56,7 @@ Vendors run their business in the vendor portal. Staff run the platform from the
 - `docs/` ARCHITECTURE, CONTRACTS, ALGORITHMS, CONVERSATION, SECURITY, TESTING, BUILD_PLAN
 
 ## Business constants (defaults; editable in admin settings)
-- Customer service fee: $2.50 per order (250 cents). Delivery fee: passed through at cost. Pickup: no delivery fee.
+- Customer service fee: $2.50 per order (250 cents). Delivery fee: the courier fee quoted in the summary; the customer pays exactly that, never more (the platform absorbs increases and keeps decreases) [CONFIRM wording with lawyer]. Pickup: no delivery fee.
 - Commission: 5% (500 bps) product vendors, 8% (800 bps) service vendors, on the pre-tax subtotal.
 - Languages: English and French. Currency: CAD. Country: Canada.
 

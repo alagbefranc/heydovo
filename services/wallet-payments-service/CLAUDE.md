@@ -7,7 +7,7 @@ The ONLY service that moves money. Double-entry ledger, wallet top-ups, holds, c
 - `ledger_accounts` (id, type, owner_type, owner_id, currency)
 - `ledger_transactions` (id, kind, ref_type, ref_id, entry_key UNIQUE, idempotency_key UNIQUE, memo, created_at)
 - `ledger_entries` (id, transaction_id, account_id, amount_cents signed) — deferred trigger: entries per transaction sum to 0; no UPDATE/DELETE (append-only)
-- `holds` (id, user_id, ref_type, ref_id, amount_cents, status held|captured|released|partially_released, expires_at)
+- `holds` (id, user_id, ref_type, ref_id, amount_cents, approval_id, status held|captured|released|partially_released, expires_at)
 - `payment_intents` (id, purpose topup|order_link, user_id, ref, amount_cents, stripe_checkout_session_id, stripe_payment_intent_id, status, expires_at)
 - `stripe_events` (event_id UNIQUE, type, processed_at)
 - `payouts` (id, vendor_id, period, amount_cents, stripe_transfer_id, status)
@@ -19,7 +19,8 @@ The ONLY service that moves money. Double-entry ledger, wallet top-ups, holds, c
 - Vendors: Stripe Connect accounts [CONFIRM Express vs Standard]; onboarding link from the vendor portal; weekly transfers.
 
 ## Key logic
-- `hold` / `capture(splits)` / `release` / `refund` exactly as docs/ALGORITHMS.md §6; every call idempotent; every ledger post has a unique entry_key. Capture splits include the tax lines and, when the booked courier fee is higher than the fee shown, the delivery subsidy line (§3, §6).
+- `hold` / `capture(splits)` / `release` / `refund` exactly as docs/ALGORITHMS.md §6; every call idempotent; every ledger post has a unique entry_key. Capture splits include the tax lines and, when the booked courier fee differs from the fee shown, the delivery subsidy line (a debit when higher, a credit when lower; §3, §6).
+- `hold` from a user's wallet needs a PIN approval: call `auth.redeemApproval(approvalId, {userId, refType, refId, amountCents}, idempotencyKey)` first and hold only on a yes (docs/ALGORITHMS.md §8). Funds that arrive by payment link are placed in hold by this service itself on the verified Stripe event and need no approval.
 - Balance = Σ entries for user_wallet (cache allowed, rebuilt in reconciliation).
 - Limits, velocity and fraud checks before holds and top-ups; refunds above threshold need two staff approvals (admin-service supplies approvals).
 - Daily reconciliation vs Stripe balance transactions; alert on mismatch.
@@ -57,4 +58,4 @@ Consumes: none for money movement (money-moving commands come by RPC, only from 
 - Expose a method on an entrypoint whose caller is not in the allowed-caller table. Take a user or vendor id from api-gateway without proof. Store card data. Update or delete ledger rows. Post unbalanced transactions.
 
 ## Tests
-Property-based tests: ledger always balances; no double post under retries/concurrency; holds never exceed balance; capture splits add up to the hold (the delivery subsidy pair is extra and nets to zero); each entrypoint exposes only its listed methods and nothing inherited; the default export has no RPC methods; gateway-facing methods reject a missing, expired or wrong-purpose token and a non-owner vendor session; refunds never exceed captured; webhook replay/forgery; reconciliation mismatch detection; payout reserves; limits.
+Property-based tests: ledger always balances; no double post under retries/concurrency; holds never exceed balance; no wallet hold without a redeemed approval (missing, expired, reused, wrong amount, wrong user); capture splits add up to the hold (with the delivery subsidy line in both directions, so `delivery_payable` always equals the booked fee); each entrypoint exposes only its listed methods and nothing inherited; the default export has no RPC methods; gateway-facing methods reject a missing, expired or wrong-purpose token and a non-owner vendor session; refunds never exceed captured; webhook replay/forgery; reconciliation mismatch detection; payout reserves; limits.
