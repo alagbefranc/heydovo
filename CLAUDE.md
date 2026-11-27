@@ -14,3 +14,7 @@ In Claude Code:
 - Run the main session on Opus 5.5.
 - For advisor or hard work, spawn a subagent with `model: "fable"`.
 - For security work, use Mythos 5.2. It is available only to verified organizations, and the subagent model picker has no `mythos` alias. If Mythos can't be selected, use Fable 5.2 for the security pass and say so.
+
+## MCP servers
+
+- **Refero** (`.mcp.json`): design references (screens, flows, styles from real apps and sites). Use it for UI and design work. It reads its token from the `REFERO_API_KEY` environment variable, set in the cloud environment's settings. Never commit the token.
