@@ -84,4 +84,4 @@ In Claude Code:
 
 ## MCP servers
 
-- **Refero** (`.mcp.json`): design references (screens, flows, styles from real apps and sites). Use it for UI and design work. It reads its token from the `REFERO_API_KEY` environment variable, set in the cloud environment's settings. Never commit the token.
+- **Refero** (`.mcp.json`): design references (screens, flows, styles from real apps and sites). Use it for UI and design work. Follow the `refero-design` skill (`.claude/skills/refero-design`) for any design work: research first, lock a visual source or an approved direction before drawing, and check the rendered result. It reads its token from the `REFERO_API_KEY` environment variable, set in the cloud environment's settings. Never commit the token.

@@ -7,3 +7,6 @@ coverage
 .turbo
 .wrangler
 worker-configuration.d.ts
+# Third-party skill files and their lock are kept exactly as installed.
+.claude/skills
+skills-lock.json
