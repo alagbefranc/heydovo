@@ -1,7 +1,7 @@
 # Vendor dashboard — design (ahead of Step 18)
 
 Design canvas: https://claude.ai/artifact/Jkym5jTFYVxSGZMFRczMZR (private to its owner until shared).
-Status: a design to review, not built. Nothing here is code for the product. Rules it follows: docs/ALGORITHMS.md §14, §17, §18, §19 and docs/CONVERSATION.md ("Guiding principle").
+Status: a design to review, not built. Redrawn on 2026-11-28 in the Hey Dovo brand as published on heydovo.com (the first version used a look that was not the brand's). Nothing here is code for the product. Rules it follows: docs/ALGORITHMS.md §14, §17, §18, §19 and docs/CONVERSATION.md ("Guiding principle").
 
 ## Screens on the canvas
 | # | Screen | What it settles |
@@ -34,38 +34,42 @@ No dashboard action ever asks for a reply code: the signed-in session with 2FA i
 
 ## Behaviour the build must keep
 - **Live.** The inbox updates without a reload. An action taken by text appears at once, with a short notice (screen 9) and a "Just handled" row (screen 1).
-- **Who and how.** Every timeline row and every "Just handled" row names the person and the channel. Channel is a chip with an icon and a word, never colour alone.
+- **Who and how.** Every activity entry and every "Just handled" row names the person and the channel in words. The activity list reads as a conversation: an action taken by message (text or WhatsApp) is a periwinkle bubble on the right, an action taken in the dashboard is a grey bubble on the left, and automatic events are a centred line. Position and colour repeat what the words say; they never carry it alone.
 - **First action wins.** A late tap gets the notice on screen 3: neutral colour, who, channel, time, "nothing was lost", one OK button, then the next useful action. It is not an error.
 - **Countdown.** New orders show time left to accept; the card moves to the top as it runs low. No sound or flashing beyond the push alert.
-- **Text command state** (screen 7): three states of one card. Normal: no card. "Codes needed until 4:15 pm": amber, with the reason and "This wasn't me". "Text commands paused until 4:15 pm": same card, same button, text says the dashboard and WhatsApp still work.
-- **Store paused** (screen 8): amber status in the header on every page, who paused and how, Resume as the primary button. Orders in progress stay fully actionable.
+- **Text command state** (screen 7): three states of one card. Normal: no card. "Codes needed until 4:15 pm": a dark card in the page header, with the reason and "This wasn't me". "Text commands paused until 4:15 pm": same card, same button, text says the dashboard and WhatsApp still work.
+- **Store paused** (screen 8): the header says "Store paused" on every page, a periwinkle notice says who paused and how, and Resume sits in the header as a light pill. Orders in progress stay fully actionable, and "Mark ready" stays the blue button.
 - **Phone verification.** Each person verifies their own number after signing in (number, then a 6-digit code). The team table only shows the status; an owner cannot verify for someone else.
 - **Roles.** Hide what a role cannot do; the API still enforces it. Staff: accept, decline, substitute, ready, pickup codes. Manager: plus pause, resume, catalogue, hours, alert recipients. Owner: plus team, payouts, statements, bank account.
 - **Uber Direct.** One card, a plain sentence first ("Kofi is on the way to you. Arrives about 4:05 pm."), then four steps: Requested, Assigned, Picked up, Delivered. Before booking it says a courier is requested when the order is marked ready.
 
-## Tokens (provisional, until the Figma link arrives)
-These are placeholders shaped like the theme `packages/ui` will hold, so they can be swapped without touching layouts.
+## Tokens (read from heydovo.com on 2026-11-28)
+The source is the live landing page: its colours, fonts, radii, buttons and logo files. Nothing here was invented, apart from the three values marked "derived". If the Figma file says otherwise, the Figma file wins.
 
 | Token | Value | Use |
 |-------|-------|-----|
-| `color.bg` | `#F4F6F5` | page background |
-| `color.surface` | `#FFFFFF` | cards, bars |
-| `color.text` | `#14201B` | text, selected tab, strong buttons |
-| `color.textMuted` | `#4B5A53` | secondary text (7:1 on white) |
-| `color.border` / `borderStrong` | `#D9E0DC` / `#B8C4BE` | card and control borders |
-| `color.primary` / `primaryHover` | `#0B6B4F` / `#084F3A` | the one main action per screen, links |
-| `color.primarySoft` | `#E6EFEA` | chips, active nav |
-| `color.attention.bg` / `text` / `border` | `#FEF3C7` / `#5C2C04` / `#E0B252` | timers, paused, codes needed |
-| `color.info.bg` / `text` / `border` | `#EAF1FB` / `#102B57` / `#A9C3EA` | first-action-wins and live notices |
-| `font.body` / `font.heading` | Inter / Space Grotesk | numbers use tabular figures |
-| `radius` | 10 controls, 14 cards, 20 sheets, 999 chips | |
-| `space` | 4, 8, 12, 16, 24 | |
-| `size.touch` | 44 minimum, 48–52 for main actions | |
+| `color.ink` | `#111B28` | text; the dark header (phone) and sidebar (desktop); dark cards; the "Decline order" button |
+| `color.inkRaised` | `#1B222B` | the active item in the dark sidebar; a card inside the dark header |
+| `color.canvas` | `#EDF0F4` | page background; chips and selected rows on white |
+| `color.surface` | `#FFFFFF` | cards, sheets, the selected tab |
+| `color.textMuted` | `#616A75` | secondary text on white or on the canvas (5.5:1 and 4.8:1) |
+| `color.onDark` / `onDarkMuted` | `#F4F6F9` / `#979FAA` | text on ink (`#B4BBC5` for longer muted text, derived) |
+| `color.primary` | `#3A68E0` | the next step on an order, or the one main action of a screen. Never a background, a link or a status. White text on it is 4.96:1 |
+| `color.primaryDeep` | `#2955D3` | link hover |
+| `color.message` | `#9FB2F0` | anything that happened by message: "By text" chips, message bubbles, notices about an action someone took, the current courier step |
+| `color.hairline` | `#DDE2E8` (derived) | dividers, the tab track, steps not reached yet |
+| `color.controlBorder` | `#7A838F` (derived) | borders of inputs, selects and switches that are off (3.9:1) |
+| `font.display` | Funnel Display, weight 400, tracking -0.02em | one headline per screen: the page title, an order number, the payout amount |
+| `font.body` | Funnel Sans, 400; 500 for labels; 600 for order codes and totals | everything else; numbers use tabular figures |
+| `radius` | 9999 buttons; 20 cards (24 on desktop); 28 sheets; 12 option rows; 6 inputs and tags | |
+| `size.touch` | 44 minimum, 48 for main actions | |
 
-Accept and Decline differ by fill and weight, not by red against green.
+There is no red, green or amber. Accept and Decline differ by fill, not by hue. Caution is the dark card; "someone did this by message" is periwinkle. If a real warning colour is wanted, it must come from the brand.
+
+Logo: `heydovo-logo-dark-tight.svg` (light wordmark, used on ink) and the three-bar symbol, taken from the site as they are. The site has no wordmark for light backgrounds, which is one reason the header and sidebar are ink.
 
 ## Components for `packages/ui`
-AppShell (phone: bottom nav; desktop: sidebar), StoreStatusBar (open / paused, location switch, Pause or Resume), StatusTabs, OrderCard (countdown variant), OrderRow, ChannelChip (text, WhatsApp, dashboard, automatic), StatusBadge, Timeline + TimelineRow, CourierCard (four-step progress), NoticeCard (info, attention), BottomSheet, ReasonList (radio rows), SubstituteList, CodeInput, VerifiedBadge, RoleSelect, AlertMatrix, StatCard, DataTable (scrolls in its box on a phone), SegmentedChoice, DateRange, PrimaryButton / SecondaryButton.
+AppShell (phone: bottom nav; desktop: sidebar), StoreStatusBar (open / paused, location switch, Pause or Resume), StatusTabs, OrderCard (countdown variant), OrderRow, ChannelChip (text, WhatsApp, dashboard, automatic), StatusBadge, ActivityThread + ActivityBubble (message, dashboard, automatic), CourierCard (four-step progress), NoticeCard (message, caution), BottomSheet, ReasonList (radio rows), SubstituteList, CodeInput, VerifiedBadge, RoleSelect, AlertMatrix, StatCard, DataTable (scrolls in its box on a phone), SegmentedChoice, DateRange, PrimaryButton / SecondaryButton.
 
 ## Patterns borrowed (Refero research, 2026-11-27)
 From Refero's descriptions of these screens; none of their branding, layouts or copy is reproduced. Refero had no food-delivery merchant apps in the searches run, so the accept / decline card with a countdown comes from this product's own rules.
@@ -86,7 +90,10 @@ From Refero's descriptions of these screens; none of their branding, layouts or 
 | A calm "paused" status with one action | Wise iOS, paused payment (https://refero.design/screens/303644bd-0d85-4e66-9143-0d96a4a0d42a) | Store paused state |
 
 ## Open questions for you
-- The Figma link, so the provisional tokens can be replaced.
+- The Figma link, to check these tokens against it (they were read from the live site).
+- Whether you want a warning colour. The brand has none, so the design uses the dark card instead.
+- Whether the activity list as a conversation (message right, dashboard left) reads clearly to vendors; the fallback is a plain list with the same words.
+- heydovo.com says "Delivered by DoorDash Drive or Uber Direct couriers". The plan is Uber Direct only, so that line on the site needs changing (the site is not in this repo).
 - French vendor wording, to be checked by a native speaker ("En cours", "Prêtes", "Marquer comme prête", "Reprendre", "Ce n'était pas moi").
 - Whether managers may see earnings (the design says owner only).
 - Whether staff may offer substitutes (the design says yes).
