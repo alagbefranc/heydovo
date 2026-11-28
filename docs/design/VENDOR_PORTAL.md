@@ -7,14 +7,14 @@ Status: a design to review, not built. Redrawn on 2026-11-28 in the Hey Dovo bra
 | # | Screen | What it settles |
 |---|--------|-----------------|
 | 1 | Orders inbox (phone) | Live inbox: store status and Pause in the header, four status tabs, a new-order card with a countdown and Accept / Decline, and "Just handled" rows that say who acted and by which channel |
-| 2 | Order detail (phone) | Uber Direct card (status sentence + four steps), items, and a timeline where every step shows who and how: By text, WhatsApp, Dashboard, Automatic |
+| 2 | Order detail (phone) | Uber Direct card (status sentence + four steps), items, and the activity list where every entry shows who and how: by text, on WhatsApp, in the dashboard, automatic |
 | 3 | First action wins (phone) | A calm notice when someone else got there first ("Kwame already accepted this order … on WhatsApp at 3:42 pm"), then the next action (Mark ready) |
 | 4 | Decline with a reason (phone) | Bottom sheet, four reasons, what happens to the customer, and a way out to a substitute |
 | 5 | Substitution (phone) | Out-of-stock sheet: swap options with prices, "No substitute", and what the customer is asked |
 | 6 | Pickup code (phone) | One large code field, forgiving input, the text alternative, "Customer has no code" |
 | 7 | Orders by text (phone) | The verified phone, the "codes needed until" state with "This wasn't me", and which commands need a code |
 | 8 | French, store paused (phone) | French copy and number formats; a paused store with who paused it and how, Resume, orders in progress still actionable |
-| 9 | Inbox and order (desktop) | Sidebar, live notice when an order was handled by text, list + detail, Mark ready, courier card before booking, timeline |
+| 9 | Inbox and order (desktop) | Sidebar, live notice when an order was handled by text, list + detail, Mark ready, courier card before booking, activity list |
 | 10 | Team and alerts (desktop) | Roles, phone verification status per person, who gets new-order alerts per channel, what each role can do |
 | 11 | Payouts and statements (desktop) | Next payout, 7-day hold, disputes, payouts table, statement download (owner only) |
 
